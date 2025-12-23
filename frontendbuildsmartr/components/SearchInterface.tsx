@@ -3,8 +3,33 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Search, Sparkles, Globe, FileText, Mic } from "lucide-react"
+import { Search, Sparkles, Globe, FileText, Mic, ImageIcon } from "lucide-react"
+
+const AnimatedIconButton = ({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: React.ElementType
+  label: string
+  onClick?: () => void
+}) => {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      className="text-muted-foreground hover:text-foreground transition-colors"
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      aria-label={label}
+    >
+      <Icon className="size-5" />
+    </motion.button>
+  )
+}
 
 export function SearchInterface() {
   const [query, setQuery] = useState("")
@@ -28,21 +53,15 @@ export function SearchInterface() {
   return (
     <div className="w-full max-w-3xl mx-auto px-4">
       <form onSubmit={handleSubmit} className="relative">
-        <div className="relative bg-surface rounded-xl border border-muted shadow-card overflow-hidden">
-          <div className="flex items-start gap-3 p-4">
-            <button
-              type="button"
-              className="mt-2 text-muted-foreground hover:text-accent transition-colors"
-              aria-label="Search"
-            >
-              <Search className="size-5" />
-            </button>
+        <div className="relative bg-surface rounded-xl border border-border shadow-sm overflow-hidden hover:border-muted transition-colors">
+          <div className="flex items-center gap-3 p-4">
+            <AnimatedIconButton icon={Search} label="Search" />
 
             <textarea
               ref={textareaRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask anything. Type @ for mentions and / for shortcuts."
+              placeholder="Ask anything regarding your construction queries."
               className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none min-h-[40px] max-h-[400px] py-2"
               rows={1}
               onKeyDown={(e) => {
@@ -54,82 +73,54 @@ export function SearchInterface() {
             />
 
             <div className="flex items-center gap-2 mt-2">
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-accent transition-colors"
-                aria-label="Add image"
+              <AnimatedIconButton icon={ImageIcon} label="Add image" />
+              <AnimatedIconButton icon={Globe} label="Web search" />
+              <AnimatedIconButton icon={FileText} label="Attach file" />
+              <AnimatedIconButton icon={Mic} label="Voice input" />
+
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
-                <FileText className="size-5" />
-              </button>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-accent transition-colors"
-                aria-label="Voice input"
-              >
-                <Mic className="size-5" />
-              </button>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-accent transition-colors"
-                aria-label="Attach file"
-              >
-                <Globe className="size-5" />
-              </button>
-              <Button
-                type="submit"
-                size="icon"
-                className="bg-accent hover:bg-accent-strong text-background rounded-lg"
-                aria-label="Submit"
-              >
-                <Sparkles className="size-5" />
-              </Button>
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="bg-accent hover:bg-accent-strong text-background rounded-lg"
+                  aria-label="Submit"
+                >
+                  <Sparkles className="size-5" />
+                </Button>
+              </motion.div>
             </div>
           </div>
         </div>
       </form>
 
-      {/* Quick action buttons */}
       <div className="flex flex-wrap gap-2 mt-4">
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full bg-surface hover:bg-muted border-muted text-foreground"
-        >
-          <Search className="size-4 mr-2" />
-          Research
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full bg-surface hover:bg-muted border-muted text-foreground"
-        >
-          <Sparkles className="size-4 mr-2" />
-          Teach me
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full bg-surface hover:bg-muted border-muted text-foreground"
-        >
-          <FileText className="size-4 mr-2" />
-          Get a job
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full bg-surface hover:bg-muted border-muted text-foreground"
-        >
-          <Globe className="size-4 mr-2" />
-          Ivvy 101
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full bg-surface hover:bg-muted border-muted text-foreground"
-        >
-          <Sparkles className="size-4 mr-2" />
-          Health
-        </Button>
+        {[
+          { icon: Search, label: "Research" },
+          { icon: Sparkles, label: "Teach me" },
+          { icon: FileText, label: "Get a job" },
+          { icon: Globe, label: "Ivvy 101" },
+          { icon: Sparkles, label: "Health" },
+        ].map((action, index) => (
+          <motion.div
+            key={index}
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full bg-surface hover:bg-muted border-border text-foreground"
+            >
+              <action.icon className="size-4 mr-2" />
+              {action.label}
+            </Button>
+          </motion.div>
+        ))}
       </div>
     </div>
   )
