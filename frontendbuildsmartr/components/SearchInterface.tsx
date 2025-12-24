@@ -73,9 +73,9 @@ export function SearchInterface() {
             />
 
             <div className="flex items-center gap-2 mt-2">
-              <AnimatedIconButton icon={ImageIcon} label="Add image" />
-              <AnimatedIconButton icon={Globe} label="Web search" />
-              <AnimatedIconButton icon={FileText} label="Attach file" />
+              {/* <AnimatedIconButton icon={ImageIcon} label="Add image" /> */}
+              {/* <AnimatedIconButton icon={Globe} label="Web search" /> */}
+              {/* <AnimatedIconButton icon={FileText} label="Attach file" /> */}
               <AnimatedIconButton icon={Mic} label="Voice input" />
 
               <motion.div
@@ -97,7 +97,7 @@ export function SearchInterface() {
         </div>
       </form>
 
-      <div className="flex flex-wrap gap-2 mt-4">
+      {/* <div className="flex flex-wrap gap-2 mt-4">
         {[
           { icon: Search, label: "Research" },
           { icon: Sparkles, label: "Teach me" },
@@ -121,7 +121,7 @@ export function SearchInterface() {
             </Button>
           </motion.div>
         ))}
-      </div>
+      </div> */}
     </div>
   )
 }
