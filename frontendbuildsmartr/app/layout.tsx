@@ -53,7 +53,7 @@ export default async function RootLayout({
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />
-        <div className="ml-20">{children}</div>
+        <div className="ml-0 md:ml-20">{children}</div>
         {/* <Analytics /> */}
       </body>
     </html>

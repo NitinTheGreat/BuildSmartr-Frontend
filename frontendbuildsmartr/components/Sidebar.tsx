@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, Library, Compass, MessageSquare, MoreHorizontal, Bell, User, LogOut } from "lucide-react"
+import { Plus, Library, Compass, MessageSquare, MoreHorizontal, Bell, User, LogOut, Menu, X } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
+import logo from "@/public/logo.png"
 
 const navItems = [
   { icon: Library, label: "Library", href: "/library" },
@@ -23,6 +25,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl)
   const [firstName, setFirstName] = useState<string | null>(initialFirstName)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -53,35 +56,15 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  return (
-    <aside className="fixed left-0 top-0 h-screen w-20 bg-[#2b2d31] flex flex-col items-center py-6 z-50">
+  const closeMobileMenu = () => setIsMobileOpen(false)
+
+  const sidebarContent = (
+    <>
       {/* Logo */}
-      <Link href="/">
+      <Link href="/" onClick={closeMobileMenu}>
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="mb-8 cursor-pointer">
           <div className="w-12 h-12 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 2L4 7L12 12L20 7L12 2Z"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M4 17L12 22L20 17"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M4 12L12 17L20 12"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <Image src={logo} alt="Logo" width={48} height={48} />
           </div>
         </motion.div>
       </Link>
@@ -98,7 +81,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
       {/* Navigation Items */}
       <nav className="flex-1 flex flex-col items-center gap-6 w-full px-3">
         {navItems.map((item) => (
-          <Link key={item.label} href={item.href} className="w-full">
+          <Link key={item.label} href={item.href} className="w-full" onClick={closeMobileMenu}>
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -138,7 +121,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
               {firstName}
             </span>
           )}
-          <Link href="/account">
+          <Link href="/account" onClick={closeMobileMenu}>
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -166,7 +149,10 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 className="absolute left-full bottom-0 ml-2 bg-[#2b2d31] border border-border rounded-lg shadow-lg py-1 min-w-[120px] z-50"
               >
                 <button
-                  onClick={handleLogout}
+                  onClick={() => {
+                    handleLogout()
+                    closeMobileMenu()
+                  }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-[#3c3f45] transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
@@ -177,6 +163,61 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
           </AnimatePresence>
         </div>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile Hamburger Button */}
+      <button
+        onClick={() => setIsMobileOpen(true)}
+        className="fixed top-4 left-4 z-50 md:hidden w-10 h-10 rounded-lg bg-[#2b2d31] flex items-center justify-center"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5 text-foreground" />
+      </button>
+
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isMobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={closeMobileMenu}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {isMobileOpen && (
+          <motion.aside
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed left-0 top-0 h-screen w-20 bg-[#2b2d31] flex flex-col items-center py-6 z-50 md:hidden"
+          >
+            {/* Close Button */}
+            <button
+              onClick={closeMobileMenu}
+              className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-transparent flex items-center justify-center hover:bg-[#3c3f45] transition-colors"
+              aria-label="Close menu"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+            {sidebarContent}
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-20 bg-[#2b2d31] flex-col items-center py-6 z-50">
+        {sidebarContent}
+      </aside>
+    </>
   )
 }
