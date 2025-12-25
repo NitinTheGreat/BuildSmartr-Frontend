@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import AuthButtons from "@/components/AuthButtons";
+import AuthStateListener from "@/components/AuthStateListener";
 
 export default async function Page() {
   const supabase = await createClient();
@@ -13,5 +14,10 @@ export default async function Page() {
     return <div className="p-4 text-foreground">You are signed in as {user.email}.</div>;
   }
 
-  return <AuthButtons />;
+  return (
+    <>
+      <AuthStateListener />
+      <AuthButtons />
+    </>
+  );
 }
