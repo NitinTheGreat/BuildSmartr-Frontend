@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, Library, Compass, MessageSquare, MoreHorizontal, Bell, User, LogOut, Menu, X } from "lucide-react"
+import { Mail, Globe, MessageSquare, FileText, History, User, LogOut, Menu, X } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter } from "next/navigation"
@@ -10,10 +10,11 @@ import Image from "next/image"
 import logo from "@/public/logo.png"
 
 const navItems = [
-  { icon: Library, label: "Library", href: "/library" },
-  { icon: Compass, label: "Discover", href: "/discover" },
-  { icon: MessageSquare, label: "Spaces", href: "/spaces" },
-  { icon: MoreHorizontal, label: "More", href: "/more" },
+  { icon: Mail, label: "Email search", href: "/email-search" },
+  { icon: Globe, label: "Web search", href: "/web-search" },
+  { icon: MessageSquare, label: "Chat", href: "/chat" },
+  { icon: FileText, label: "Quotes", href: "/quotes" },
+  { icon: History, label: "History", href: "/history" },
 ]
 
 type SidebarProps = {
@@ -69,23 +70,14 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
         </motion.div>
       </Link>
 
-      {/* Plus Button */}
-      <motion.button
-        whileHover={{ scale: 1.1, backgroundColor: "#3c3f45" }}
-        whileTap={{ scale: 0.9 }}
-        className="w-12 h-12 rounded-lg bg-transparent flex items-center justify-center mb-6 transition-colors"
-      >
-        <Plus className="w-6 h-6 text-muted-foreground" />
-      </motion.button>
-
       {/* Navigation Items */}
-      <nav className="flex-1 flex flex-col items-center gap-6 w-full px-3">
+      <nav className="flex-1 flex flex-col items-center justify-center gap-4 w-full px-3">
         {navItems.map((item) => (
           <Link key={item.label} href={item.href} className="w-full" onClick={closeMobileMenu}>
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="flex flex-col items-center gap-1 cursor-pointer group"
+              className="relative flex items-center justify-center cursor-pointer group"
             >
               <motion.div
                 whileHover={{ backgroundColor: "#3c3f45" }}
@@ -93,9 +85,10 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
               >
                 <item.icon className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
               </motion.div>
-              <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+              {/* Tooltip on hover */}
+              <div className="absolute left-full ml-2 px-2 py-1 bg-[#2b2d31] border border-border rounded-md text-sm text-foreground whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 pointer-events-none">
                 {item.label}
-              </span>
+              </div>
             </motion.div>
           </Link>
         ))}
@@ -103,14 +96,6 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
       {/* Bottom Icons */}
       <div className="flex flex-col items-center gap-6 mt-auto">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          className="w-12 h-12 rounded-lg bg-transparent flex items-center justify-center transition-colors hover:bg-[#3c3f45]"
-        >
-          <Bell className="w-5 h-5 text-muted-foreground" />
-        </motion.button>
-
         <div
           className="relative"
           onMouseEnter={() => setShowDropdown(true)}
