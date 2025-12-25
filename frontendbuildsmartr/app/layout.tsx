@@ -1,18 +1,27 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Inter, JetBrains_Mono } from "next/font/google"
 // import { Analytics } from "@vercel/analytics/next"
 import { Sidebar } from "@/components/Sidebar"
 import { createClient } from "@/utils/supabase/server"
 import "./globals.css"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+})
+
+const jetbrainsMono = JetBrains_Mono({ 
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "BuildSmartr",
+  description: "AI-powered research assistant for smarter building decisions.",
+  generator: "Next.js",
   icons: {
     icon: [
       {
@@ -50,7 +59,7 @@ export default async function RootLayout({
   console.log("[layout] avatarUrl:", avatarUrl)
 
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className={`font-sans antialiased`}>
         <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />
         <div className="ml-0 md:ml-20">{children}</div>

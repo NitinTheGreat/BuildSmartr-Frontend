@@ -12,10 +12,13 @@ export default function AuthButtons() {
         ? "openid email profile"
         : "openid email profile User.Read";
 
+    // Use current origin for redirect URL (works for both localhost and production)
+    const redirectTo = `${window.location.origin}/auth/callback`;
+
     await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: "http://localhost:3000/auth/callback",
+        redirectTo,
         scopes,
         queryParams: provider === "google" ? { access_type: "offline", prompt: "consent" } : undefined,
       },
