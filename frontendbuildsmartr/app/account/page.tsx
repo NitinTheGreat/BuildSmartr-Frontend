@@ -1,6 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import ConnectEmailButtons from "@/components/ConnectEmailButtons";
+import CompanyInfoEditor from "@/components/CompanyInfoEditor";
 
 export default async function AccountPage() {
   const supabase = await createClient();
@@ -11,6 +13,13 @@ export default async function AccountPage() {
   if (!user) {
     redirect("/");
   }
+
+  // Fetch user_info to get connected email accounts
+  const { data: userInfo } = await supabase
+    .from("user_info")
+    .select("gmail_email, outlook_email, user_company_info")
+    .eq("email", user.email)
+    .single();
 
   const metadata = user.user_metadata;
   const avatarUrl = metadata?.avatar_url ?? metadata?.picture ?? null;
@@ -88,52 +97,26 @@ export default async function AccountPage() {
           </div>
         </div>
 
-        {/* Provider Info */}
-        {user.identities && user.identities.length > 0 && (
-          <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">Connected Accounts</h3>
-            <div className="space-y-3 sm:space-y-4">
-              {user.identities.map((identity) => {
-                const identityAvatar =
-                  (identity.identity_data as { avatar_url?: string; picture?: string })?.avatar_url ??
-                  (identity.identity_data as { avatar_url?: string; picture?: string })?.picture ??
-                  null;
+        {/* Company Information */}
+        <div className="bg-surface border border-border rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">Company Information</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Tell us about your company so we can better assist you with your projects.
+          </p>
+          <CompanyInfoEditor initialValue={userInfo?.user_company_info} />
+        </div>
 
-                return (
-                  <div
-                    key={identity.identity_id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-muted/20 rounded-lg gap-3 sm:gap-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      {identityAvatar ? (
-                        <img
-                          src={identityAvatar}
-                          alt={`${identity.provider} avatar`}
-                          className="w-10 h-10 rounded-full object-cover shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-semibold text-accent capitalize">
-                            {identity.provider.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground capitalize">{identity.provider}</p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {(identity.identity_data as { email?: string })?.email ?? "No email"}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground sm:shrink-0">
-                      Connected {identity.created_at ? new Date(identity.created_at).toLocaleDateString() : "Unknown"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Connect Email Accounts */}
+        <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">Connect Email Accounts</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Connect your Gmail or Outlook account to enable email features.
+          </p>
+          <ConnectEmailButtons 
+            gmailEmail={userInfo?.gmail_email} 
+            outlookEmail={userInfo?.outlook_email} 
+          />
+        </div>
       </div>
     </div>
   );
