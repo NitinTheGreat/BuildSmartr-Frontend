@@ -61,8 +61,8 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className={`font-sans antialiased`}>
-        <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />
-        <div className="ml-0 md:ml-20">{children}</div>
+        {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
+        <div className={user ? "ml-0 md:ml-20" : ""}>{children}</div>
         {/* <Analytics /> */}
       </body>
     </html>

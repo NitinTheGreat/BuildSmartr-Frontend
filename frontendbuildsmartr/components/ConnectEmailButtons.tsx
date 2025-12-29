@@ -65,85 +65,89 @@ export default function ConnectEmailButtons({ gmailEmail, outlookEmail }: Connec
 
   return (
     <div className="space-y-4">
-      {/* Gmail Connection */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/20 rounded-lg gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
-            <Image src="/gmail.svg" alt="Gmail" width={24} height={24} />
+      {/* Gmail Connection - only show if no Outlook connected */}
+      {!outlookEmail && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/20 rounded-lg gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
+              <Image src="/gmail.svg" alt="Gmail" width={24} height={24} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">Gmail</p>
+              {gmailEmail ? (
+                <p className="text-sm text-green-400 truncate">{gmailEmail}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Not connected</p>
+              )}
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="font-medium text-foreground">Gmail</p>
-            {gmailEmail ? (
-              <p className="text-sm text-green-400 truncate">{gmailEmail}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">Not connected</p>
-            )}
-          </div>
-        </div>
-        {gmailEmail ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded-full">Connected</span>
+          {gmailEmail ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded-full">Connected</span>
+              <Button
+                onClick={handleDisconnectGmail}
+                variant="outline"
+                size="sm"
+                className="text-red-400 border-red-400/50 hover:bg-red-500/10"
+              >
+                Disconnect
+              </Button>
+            </div>
+          ) : (
             <Button
-              onClick={handleDisconnectGmail}
+              onClick={handleConnectGmail}
               variant="outline"
               size="sm"
-              className="text-red-400 border-red-400/50 hover:bg-red-500/10"
+              className="group relative overflow-hidden bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300"
             >
-              Disconnect
+              <GoogleLogo className="mr-2 w-4 h-4" />
+              Connect Gmail
             </Button>
-          </div>
-        ) : (
-          <Button
-            onClick={handleConnectGmail}
-            variant="outline"
-            size="sm"
-            className="group relative overflow-hidden bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300"
-          >
-            <GoogleLogo className="mr-2 w-4 h-4" />
-            Connect Gmail
-          </Button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* Outlook Connection */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/20 rounded-lg gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
-            <Image src="/outlook.svg" alt="Outlook" width={24} height={24} />
+      {/* Outlook Connection - only show if no Gmail connected */}
+      {!gmailEmail && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/20 rounded-lg gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
+              <Image src="/outlook.svg" alt="Outlook" width={24} height={24} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">Outlook</p>
+              {outlookEmail ? (
+                <p className="text-sm text-blue-400 truncate">{outlookEmail}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Not connected</p>
+              )}
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="font-medium text-foreground">Outlook</p>
-            {outlookEmail ? (
-              <p className="text-sm text-blue-400 truncate">{outlookEmail}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">Not connected</p>
-            )}
-          </div>
-        </div>
-        {outlookEmail ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-full">Connected</span>
+          {outlookEmail ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-full">Connected</span>
+              <Button
+                onClick={handleDisconnectOutlook}
+                variant="outline"
+                size="sm"
+                className="text-red-400 border-red-400/50 hover:bg-red-500/10"
+              >
+                Disconnect
+              </Button>
+            </div>
+          ) : (
             <Button
-              onClick={handleDisconnectOutlook}
+              onClick={handleConnectOutlook}
               variant="outline"
               size="sm"
-              className="text-red-400 border-red-400/50 hover:bg-red-500/10"
+              className="group relative overflow-hidden bg-white hover:bg-blue-50 text-gray-700 border-gray-200 hover:border-blue-300"
             >
-              Disconnect
+              <Image src="/outlook.svg" alt="Outlook" width={16} height={16} className="mr-2" />
+              Connect Outlook
             </Button>
-          </div>
-        ) : (
-          <Button
-            onClick={handleConnectOutlook}
-            variant="outline"
-            size="sm"
-            className="group relative overflow-hidden bg-white hover:bg-blue-50 text-gray-700 border-gray-200 hover:border-blue-300"
-          >
-            <Image src="/outlook.svg" alt="Outlook" width={16} height={16} className="mr-2" />
-            Connect Outlook
-          </Button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
