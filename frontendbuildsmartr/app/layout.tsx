@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google"
 // import { Analytics } from "@vercel/analytics/next"
 import { Sidebar } from "@/components/Sidebar"
 import { createClient } from "@/utils/supabase/server"
+import { ProjectProvider } from "@/contexts/ProjectContext"
 import "./globals.css"
 
 const inter = Inter({ 
@@ -61,8 +62,10 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className={`font-sans antialiased`}>
-        {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
-        <div className={user ? "ml-0 md:ml-20" : ""}>{children}</div>
+        <ProjectProvider>
+          {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
+          <div className={user ? "ml-0 md:ml-20 transition-all duration-300" : ""}>{children}</div>
+        </ProjectProvider>
         {/* <Analytics /> */}
       </body>
     </html>

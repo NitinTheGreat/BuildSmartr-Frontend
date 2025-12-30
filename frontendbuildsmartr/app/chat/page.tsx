@@ -7,7 +7,7 @@ export default function HomePage() {
       {/* Logo */}
       <div className="mb-12">
         <h1 className="text-5xl font-bold tracking-tight">
-          <span className="text-foreground">Ivvy</span>
+          <span className="text-foreground">IIvy</span>
           {/* <span className="text-accent">pro</span> */}
         </h1>
       </div>
