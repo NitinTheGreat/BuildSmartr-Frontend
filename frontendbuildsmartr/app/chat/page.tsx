@@ -1,21 +1,14 @@
 import { Suspense } from "react"
-import { SearchInterface } from "@/components/SearchInterface"
+import { GeneralChatInterface } from "@/components/GeneralChatInterface"
 
-export default function HomePage() {
+export default function ChatPage() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8">
-      {/* Logo */}
-      <div className="mb-12">
-        <h1 className="text-5xl font-bold tracking-tight">
-          <span className="text-foreground">IIvy</span>
-          {/* <span className="text-accent">pro</span> */}
-        </h1>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
-
-      {/* Search Interface */}
-      <Suspense fallback={null}>
-        <SearchInterface />
-      </Suspense>
-    </main>
+    }>
+      <GeneralChatInterface />
+    </Suspense>
   )
 }

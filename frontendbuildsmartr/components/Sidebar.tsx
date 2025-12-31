@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { History, User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft } from "lucide-react"
+import { User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
@@ -23,9 +23,11 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
   const pathname = usePathname()
-  const { projects, setCurrentProject } = useProjects()
+  const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat } = useProjects()
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -57,10 +59,39 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
   const closeMobileMenu = () => setIsMobileOpen(false)
 
-  const handleProjectClick = (projectId: string) => {
+  const handleProjectClick = (projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     const project = projects.find(p => p.id === projectId)
     if (project) {
       setCurrentProject(project)
+      // Toggle expanded state for this project
+      if (expandedProjectId === projectId) {
+        setExpandedProjectId(null)
+      } else {
+        setExpandedProjectId(projectId)
+        // Auto-expand sidebar when expanding a project
+        if (!isExpanded && !isMobileOpen) {
+          setIsExpanded(true)
+        }
+      }
+    }
+  }
+
+  const handleProjectNavigate = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      setCurrentProject(project)
+      setCurrentChatId(null)
+      router.push(`/project/${projectId}`)
+      closeMobileMenu()
+    }
+  }
+
+  const handleChatClick = (projectId: string, chatId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      setCurrentProject(project)
+      setCurrentChatId(chatId)
       router.push(`/project/${projectId}`)
       closeMobileMenu()
     }
@@ -152,6 +183,22 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
         </Tooltip>
       </div>
 
+      {/* Search Box - Expanded View Only */}
+      {isExpandedView && (
+        <div className="w-full px-3 mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#3c3f45] border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Projects Section */}
       <div className={`flex-1 w-full ${isExpandedView ? 'px-3' : 'px-2'} overflow-hidden flex flex-col`}>
         {/* New Project Button */}
@@ -170,52 +217,127 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
           </motion.button>
         </Tooltip>
 
-        {/* Projects List */}
-        {projects.length > 0 && (
-          <div className="flex-1 overflow-y-auto space-y-1">
-            {isExpandedView && (
-              <span className="text-[10px] uppercase text-muted-foreground px-1 mb-2 block">Projects</span>
-            )}
-            {projects.map((project) => (
-              <Tooltip key={project.id} label={project.name}>
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleProjectClick(project.id)}
-                  className={`
-                    flex items-center ${isExpandedView ? 'gap-3 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
-                    ${pathname === `/project/${project.id}` 
-                      ? 'bg-accent/20 text-foreground' 
-                      : 'hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground'
-                    }
-                  `}
-                >
-                  <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                  {isExpandedView && <span className="text-sm truncate">{project.name}</span>}
-                </motion.div>
-              </Tooltip>
-            ))}
-          </div>
-        )}
-      </div>
+        {/* Scrollable content area for projects and chats */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3">
+          {/* Projects List */}
+          {projects.filter(p => searchQuery === '' || p.name.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
+            <div className="space-y-1">
+              {isExpandedView && (
+                <span className="text-[10px] uppercase text-muted-foreground px-1 mb-2 block">Projects</span>
+              )}
+              {projects
+                .filter(p => searchQuery === '' || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map((project) => {
+                  const isProjectExpanded = expandedProjectId === project.id
+                  const isCurrentProject = pathname === `/project/${project.id}`
+                  
+                  return (
+                    <div key={project.id}>
+                      <Tooltip label={project.name}>
+                        <motion.div
+                          whileTap={{ scale: 0.98 }}
+                          onClick={(e) => handleProjectClick(project.id, e)}
+                          className={`
+                            flex items-center ${isExpandedView ? 'gap-2 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
+                            ${isCurrentProject 
+                              ? 'bg-accent/20 text-foreground' 
+                              : 'hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground'
+                            }
+                          `}
+                        >
+                          {isExpandedView && (
+                            <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                              {project.chats.length > 0 ? (
+                                isProjectExpanded ? (
+                                  <ChevronDown className="w-3 h-3" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3" />
+                                )
+                              ) : null}
+                            </span>
+                          )}
+                          <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                          {isExpandedView && (
+                            <>
+                              <span 
+                                className="text-sm truncate flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleProjectNavigate(project.id)
+                                }}
+                              >
+                                {project.name}
+                              </span>
+                              {project.chats.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground">{project.chats.length}</span>
+                              )}
+                            </>
+                          )}
+                        </motion.div>
+                      </Tooltip>
+                      
+                      {/* Chats list - shown when project is expanded */}
+                      {isExpandedView && isProjectExpanded && project.chats.length > 0 && (
+                        <AnimatePresence>
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="ml-6 mt-1 space-y-1 border-l border-border pl-2"
+                          >
+                            {project.chats.map((chat) => (
+                              <motion.div
+                                key={chat.id}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => handleChatClick(project.id, chat.id)}
+                                className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground"
+                              >
+                                <MessageSquare className="w-3 h-3 flex-shrink-0" />
+                                <span className="text-xs truncate">{chat.title}</span>
+                              </motion.div>
+                            ))}
+                          </motion.div>
+                        </AnimatePresence>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          )}
 
-      {/* History Link */}
-      <div className={`w-full ${isExpandedView ? 'px-3' : 'px-2'} mt-auto mb-4`}>
-        <Tooltip label="History">
-          <Link href="/history" onClick={closeMobileMenu}>
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`
-                flex items-center ${isExpandedView ? 'justify-start gap-3 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors
-                ${pathname === '/history' ? 'bg-[#3c3f45] text-foreground' : 'hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground'}
-              `}
-            >
-              <History className="w-4 h-4 flex-shrink-0" />
-              {isExpandedView && <span className="text-sm font-medium">History</span>}
-            </motion.div>
-          </Link>
-        </Tooltip>
+          {/* General Chats Section */}
+          {generalChats.filter(c => searchQuery === '' || c.title.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
+            <div className="space-y-1">
+              {isExpandedView && (
+                <span className="text-[10px] uppercase text-muted-foreground px-1 mb-2 block">Chats</span>
+              )}
+              {generalChats
+                .filter(c => searchQuery === '' || c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map((chat) => (
+                  <Tooltip key={chat.id} label={chat.title}>
+                    <motion.div
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        setCurrentGeneralChatId(chat.id)
+                        router.push('/chat')
+                        closeMobileMenu()
+                      }}
+                      className={`
+                        flex items-center ${isExpandedView ? 'gap-2 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
+                        hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground
+                      `}
+                    >
+                      <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                      {isExpandedView && (
+                        <span className="text-sm truncate flex-1">{chat.title}</span>
+                      )}
+                    </motion.div>
+                  </Tooltip>
+                ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bottom - User Account */}
@@ -315,7 +437,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-0 top-0 h-screen w-64 bg-[#2b2d31] flex flex-col py-4 z-50 md:hidden"
+            className="fixed left-0 top-0 h-screen w-64 bg-[#2b2d31] flex flex-col py-4 z-50 md:hidden overflow-x-hidden"
           >
             {/* Close Button */}
             <button
@@ -332,7 +454,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
       {/* Desktop Sidebar */}
       <aside 
-        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col py-4 z-50 transition-all duration-300 ease-in-out ${
+        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col py-4 z-50 transition-all duration-300 ease-in-out overflow-x-hidden ${
           isExpanded ? 'w-64' : 'w-20'
         }`}
       >

@@ -1,39 +1,36 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Search, Sparkles, Globe, FileText, Mic, ImageIcon } from "lucide-react"
+import { Sparkles, Globe, Mail, Quote, FileText, Mic, ChevronDown, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useProjects } from "@/contexts/ProjectContext"
+import type { SearchMode, ChatMessage } from "@/types/project"
 
-const AnimatedIconButton = ({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: React.ElementType
+interface SearchModeOption {
+  id: SearchMode
   label: string
-  onClick?: () => void
-}) => {
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      className="text-muted-foreground hover:text-foreground transition-colors"
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.95 }}
-      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-      aria-label={label}
-    >
-      <Icon className="size-5" />
-    </motion.button>
-  )
+  icon: React.ElementType
+  exclusive?: boolean
 }
+
+const searchModeOptions: SearchModeOption[] = [
+  { id: 'web', label: 'Web Search', icon: Globe },
+  { id: 'email', label: 'Email Search', icon: Mail },
+  { id: 'quotes', label: 'Quotes', icon: Quote },
+  { id: 'pdf', label: 'PDF Search', icon: FileText, exclusive: true },
+]
 
 export function SearchInterface() {
   const [query, setQuery] = useState("")
+  const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+  const { createGeneralChat, addMessageToGeneralChat, updateGeneralChatTitle } = useProjects()
 
   // Auto-expand textarea based on content
   useEffect(() => {
@@ -44,19 +41,129 @@ export function SearchInterface() {
     }
   }, [query])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleModeToggle = (mode: SearchMode) => {
+    const option = searchModeOptions.find(o => o.id === mode)
+    
+    if (option?.exclusive) {
+      // If PDF is selected, clear all others and only select PDF
+      if (selectedModes.includes(mode)) {
+        setSelectedModes([])
+      } else {
+        setSelectedModes([mode])
+      }
+    } else {
+      // If selecting a non-exclusive mode, remove PDF if it's selected
+      if (selectedModes.includes('pdf')) {
+        setSelectedModes([mode])
+      } else if (selectedModes.includes(mode)) {
+        setSelectedModes(prev => prev.filter(m => m !== mode))
+      } else {
+        setSelectedModes(prev => [...prev, mode])
+      }
+    }
+  }
+
+  const removeMode = (mode: SearchMode) => {
+    setSelectedModes(prev => prev.filter(m => m !== mode))
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle search submission
-    console.log("Search query:", query)
+    if (!query.trim()) return
+
+    // Create a new general chat
+    const chat = createGeneralChat(query.trim().slice(0, 50))
+
+    // Add the user message
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: query.trim(),
+      timestamp: new Date(),
+      searchModes: selectedModes.length > 0 ? selectedModes : undefined,
+    }
+    addMessageToGeneralChat(chat.id, userMessage)
+    updateGeneralChatTitle(chat.id, query.trim().slice(0, 50))
+
+    // Simulate AI response
+    setTimeout(() => {
+      const modesText = selectedModes.length > 0 
+        ? `Using ${selectedModes.join(', ')} mode(s), ` 
+        : ''
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `${modesText}I understand you're asking about "${query.trim()}". How can I help you further?`,
+        timestamp: new Date(),
+      }
+      addMessageToGeneralChat(chat.id, assistantMessage)
+    }, 1000)
+
+    // Navigate to chat page
+    router.push('/chat')
+  }
+
+  const getModeIcon = (mode: SearchMode) => {
+    const option = searchModeOptions.find(o => o.id === mode)
+    return option?.icon || Globe
+  }
+
+  const getModeLabel = (mode: SearchMode) => {
+    const option = searchModeOptions.find(o => o.id === mode)
+    return option?.label || mode
   }
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4">
       <form onSubmit={handleSubmit} className="relative">
-        <div className="relative bg-surface rounded-xl border border-border shadow-sm overflow-hidden hover:border-muted transition-colors">
-          <div className="flex items-center gap-3 p-4">
-            <AnimatedIconButton icon={Search} label="Search" />
+        <div className="relative bg-surface rounded-xl border border-border shadow-sm hover:border-muted transition-colors overflow-visible">
+          {/* Selected modes chips */}
+          <AnimatePresence>
+            {selectedModes.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-4 pt-3 flex flex-wrap gap-2"
+              >
+                {selectedModes.map(mode => {
+                  const Icon = getModeIcon(mode)
+                  return (
+                    <motion.div
+                      key={mode}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-accent/20 text-accent rounded-full text-xs font-medium"
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{getModeLabel(mode)}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeMode(mode)}
+                        className="hover:bg-accent/30 rounded-full p-0.5 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </motion.div>
+                  )
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
+          <div className="flex items-start gap-3 p-4">
             <textarea
               ref={textareaRef}
               value={query}
@@ -73,20 +180,93 @@ export function SearchInterface() {
             />
 
             <div className="flex items-center gap-2 mt-2">
-              {/* <AnimatedIconButton icon={ImageIcon} label="Add image" /> */}
-              {/* <AnimatedIconButton icon={Globe} label="Web search" /> */}
-              {/* <AnimatedIconButton icon={FileText} label="Attach file" /> */}
-              <AnimatedIconButton icon={Mic} label="Voice input" />
+              {/* Search mode dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <motion.button
+                  type="button"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className={`flex items-center gap-1 p-1.5 rounded-lg transition-colors ${
+                    selectedModes.length > 0 
+                      ? 'text-accent bg-accent/10' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-[#3c3f45]'
+                  }`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Globe className="w-5 h-5" />
+                  <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </motion.button>
+
+                <AnimatePresence>
+                  {isDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 bottom-full mb-2 bg-[#2b2d31] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
+                    >
+                      {searchModeOptions.map((option) => {
+                        const Icon = option.icon
+                        const isSelected = selectedModes.includes(option.id)
+                        const isDisabled = option.exclusive 
+                          ? selectedModes.length > 0 && !selectedModes.includes('pdf')
+                          : selectedModes.includes('pdf')
+                        
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => handleModeToggle(option.id)}
+                            disabled={isDisabled && !isSelected}
+                            className={`
+                              w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors
+                              ${isSelected 
+                                ? 'bg-accent/20 text-accent' 
+                                : isDisabled 
+                                  ? 'text-muted-foreground/50 cursor-not-allowed'
+                                  : 'text-foreground hover:bg-[#3c3f45]'
+                              }
+                            `}
+                          >
+                            <Icon className={`w-4 h-4 ${isSelected ? 'text-accent' : ''}`} />
+                            <span className="flex-1 text-left">{option.label}</span>
+                            {isSelected && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="w-2 h-2 rounded-full bg-accent"
+                              />
+                            )}
+                          </button>
+                        )
+                      })}
+                      
+                      
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <motion.button
+                type="button"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                aria-label="Voice input"
+              >
+                <Mic className="size-5" />
+              </motion.button>
 
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 <Button
                   type="submit"
                   size="icon"
-                  className="bg-accent hover:bg-accent-strong text-background rounded-lg"
+                  disabled={!query.trim()}
+                  className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50"
                   aria-label="Submit"
                 >
                   <Sparkles className="size-5" />
@@ -96,32 +276,6 @@ export function SearchInterface() {
           </div>
         </div>
       </form>
-
-      {/* <div className="flex flex-wrap gap-2 mt-4">
-        {[
-          { icon: Search, label: "Research" },
-          { icon: Sparkles, label: "Teach me" },
-          { icon: FileText, label: "Get a job" },
-          { icon: Globe, label: "Ivvy 101" },
-          { icon: Sparkles, label: "Health" },
-        ].map((action, index) => (
-          <motion.div
-            key={index}
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full bg-surface hover:bg-muted border-border text-foreground"
-            >
-              <action.icon className="size-4 mr-2" />
-              {action.label}
-            </Button>
-          </motion.div>
-        ))}
-      </div> */}
     </div>
   )
 }

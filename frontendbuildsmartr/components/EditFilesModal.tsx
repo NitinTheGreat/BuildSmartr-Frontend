@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Upload, File, Trash2 } from "lucide-react"
+import { X, File, Trash2, HardHat, Ruler, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useProjects } from "@/contexts/ProjectContext"
-import type { ProjectFile } from "@/types/project"
+import type { ProjectFile, FileCategory } from "@/types/project"
 
 interface EditFilesModalProps {
   isOpen: boolean
@@ -14,50 +14,108 @@ interface EditFilesModalProps {
   currentFiles: ProjectFile[]
 }
 
+interface CategoryFile {
+  file: ProjectFile | null
+  isDragging: boolean
+  isNew: boolean
+}
+
+type CategoryFiles = Record<FileCategory, CategoryFile>
+
 export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: EditFilesModalProps) {
-  const [files, setFiles] = useState<ProjectFile[]>(currentFiles)
-  const [newFiles, setNewFiles] = useState<ProjectFile[]>([])
+  const initializeCategoryFiles = (): CategoryFiles => {
+    const initial: CategoryFiles = {
+      construction: { file: null, isDragging: false, isNew: false },
+      architectural: { file: null, isDragging: false, isNew: false },
+      other: { file: null, isDragging: false, isNew: false },
+    }
+    
+    currentFiles.forEach(file => {
+      if (file.category && initial[file.category]) {
+        initial[file.category] = { file, isDragging: false, isNew: false }
+      }
+    })
+    
+    return initial
+  }
+
+  const [categoryFiles, setCategoryFiles] = useState<CategoryFiles>(initializeCategoryFiles)
   const [removedFileIds, setRemovedFileIds] = useState<string[]>([])
-  const [isDragging, setIsDragging] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  const fileInputRefs = {
+    construction: useRef<HTMLInputElement>(null),
+    architectural: useRef<HTMLInputElement>(null),
+    other: useRef<HTMLInputElement>(null),
+  }
   const { addFilesToProject, removeFileFromProject } = useProjects()
 
-  const handleFileSelect = (selectedFiles: FileList | null) => {
-    if (!selectedFiles) return
+  useEffect(() => {
+    if (isOpen) {
+      setCategoryFiles(initializeCategoryFiles())
+      setRemovedFileIds([])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, currentFiles])
+
+  const handleFileSelect = (selectedFiles: FileList | null, category: FileCategory) => {
+    if (!selectedFiles || selectedFiles.length === 0) return
     
-    const addedFiles: ProjectFile[] = Array.from(selectedFiles).map(file => ({
+    const file = selectedFiles[0]
+    const newFile: ProjectFile = {
       id: crypto.randomUUID(),
       name: file.name,
       size: file.size,
       type: file.type,
-    }))
+      category,
+    }
     
-    setNewFiles(prev => [...prev, ...addedFiles])
+    // If there was an existing file, mark it for removal
+    const existingFile = categoryFiles[category].file
+    if (existingFile && !categoryFiles[category].isNew) {
+      setRemovedFileIds(prev => [...prev, existingFile.id])
+    }
+    
+    setCategoryFiles(prev => ({
+      ...prev,
+      [category]: { file: newFile, isDragging: false, isNew: true }
+    }))
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, category: FileCategory) => {
     e.preventDefault()
-    setIsDragging(true)
+    setCategoryFiles(prev => ({
+      ...prev,
+      [category]: { ...prev[category], isDragging: true }
+    }))
   }
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent, category: FileCategory) => {
     e.preventDefault()
-    setIsDragging(false)
+    setCategoryFiles(prev => ({
+      ...prev,
+      [category]: { ...prev[category], isDragging: false }
+    }))
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent, category: FileCategory) => {
     e.preventDefault()
-    setIsDragging(false)
-    handleFileSelect(e.dataTransfer.files)
+    setCategoryFiles(prev => ({
+      ...prev,
+      [category]: { ...prev[category], isDragging: false }
+    }))
+    handleFileSelect(e.dataTransfer.files, category)
   }
 
-  const removeExistingFile = (fileId: string) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId))
-    setRemovedFileIds(prev => [...prev, fileId])
-  }
-
-  const removeNewFile = (fileId: string) => {
-    setNewFiles(prev => prev.filter(f => f.id !== fileId))
+  const removeFile = (category: FileCategory) => {
+    const existingFile = categoryFiles[category].file
+    if (existingFile && !categoryFiles[category].isNew) {
+      setRemovedFileIds(prev => [...prev, existingFile.id])
+    }
+    
+    setCategoryFiles(prev => ({
+      ...prev,
+      [category]: { file: null, isDragging: false, isNew: false }
+    }))
   }
 
   const handleSave = () => {
@@ -67,6 +125,10 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
     })
     
     // Add new files
+    const newFiles = Object.values(categoryFiles)
+      .filter(cf => cf.file && cf.isNew)
+      .map(cf => cf.file as ProjectFile)
+    
     if (newFiles.length > 0) {
       addFilesToProject(projectId, newFiles)
     }
@@ -75,9 +137,7 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
   }
 
   const handleClose = () => {
-    // Reset state when closing without saving
-    setFiles(currentFiles)
-    setNewFiles([])
+    setCategoryFiles(initializeCategoryFiles())
     setRemovedFileIds([])
     onClose()
   }
@@ -88,7 +148,83 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
-  const allFiles = [...files, ...newFiles]
+  const categoryConfig: Record<FileCategory, { label: string; icon: React.ReactNode; description: string }> = {
+    construction: {
+      label: 'Construction',
+      icon: <HardHat className="w-6 h-6" />,
+      description: 'Construction drawings & specs',
+    },
+    architectural: {
+      label: 'Architectural',
+      icon: <Ruler className="w-6 h-6" />,
+      description: 'Architectural plans & designs',
+    },
+    other: {
+      label: 'Other',
+      icon: <FileText className="w-6 h-6" />,
+      description: 'Other project documents',
+    },
+  }
+
+  const FileUploadBox = ({ category }: { category: FileCategory }) => {
+    const config = categoryConfig[category]
+    const { file, isDragging, isNew } = categoryFiles[category]
+
+    return (
+      <div className="flex-1">
+        <label className="block text-xs font-medium text-foreground mb-1.5">
+          {config.label}
+        </label>
+        {file ? (
+          <div className={`border rounded-lg p-3 ${isNew ? 'bg-accent/10 border-accent/30' : 'bg-[#1f2121] border-border'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <File className={`w-4 h-4 flex-shrink-0 ${isNew ? 'text-accent' : 'text-muted-foreground'}`} />
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground truncate">{file.name}</p>
+                  <div className="flex items-center gap-2">
+                    {isNew && <span className="text-xs text-accent">New</span>}
+                    <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeFile(category)}
+                className="p-1 hover:bg-[#3c3f45] rounded transition-colors flex-shrink-0"
+              >
+                <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-400" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onDragOver={(e) => handleDragOver(e, category)}
+            onDragLeave={(e) => handleDragLeave(e, category)}
+            onDrop={(e) => handleDrop(e, category)}
+            onClick={() => fileInputRefs[category].current?.click()}
+            className={`
+              border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors
+              ${isDragging 
+                ? 'border-accent bg-accent/10' 
+                : 'border-border hover:border-muted-foreground hover:bg-[#1f2121]/50'
+              }
+            `}
+          >
+            <div className="text-muted-foreground mb-1">{config.icon}</div>
+            <p className="text-xs text-muted-foreground">{config.description}</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-1">Click or drag</p>
+            <input
+              ref={fileInputRefs[category]}
+              type="file"
+              onChange={(e) => handleFileSelect(e.target.files, category)}
+              className="hidden"
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <AnimatePresence>
@@ -124,88 +260,18 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
 
             {/* Content */}
             <div className="p-4 space-y-4">
-              {/* Drop Zone */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`
-                  border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-                  ${isDragging 
-                    ? 'border-accent bg-accent/10' 
-                    : 'border-border hover:border-muted-foreground'
-                  }
-                `}
-              >
-                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Drag & drop files here, or click to browse
+              {/* File Upload - 3 Categories */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Upload one file per category. Replacing a file will remove the previous one.
                 </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  onChange={(e) => handleFileSelect(e.target.files)}
-                  className="hidden"
-                />
-              </div>
-
-              {/* File List */}
-              {allFiles.length > 0 ? (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  <span className="text-xs text-muted-foreground">
-                    {allFiles.length} file{allFiles.length !== 1 ? 's' : ''}
-                  </span>
-                  {files.map(file => (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between p-2 bg-[#1f2121] rounded-lg"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <File className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-sm text-foreground truncate">{file.name}</span>
-                        <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {formatFileSize(file.size)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeExistingFile(file.id)}
-                        className="p-1 hover:bg-[#3c3f45] rounded transition-colors flex-shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive-foreground" />
-                      </button>
-                    </div>
-                  ))}
-                  {newFiles.map(file => (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between p-2 bg-accent/10 border border-accent/30 rounded-lg"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <File className="w-4 h-4 text-accent flex-shrink-0" />
-                        <span className="text-sm text-foreground truncate">{file.name}</span>
-                        <span className="text-xs text-accent flex-shrink-0">New</span>
-                        <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {formatFileSize(file.size)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeNewFile(file.id)}
-                        className="p-1 hover:bg-[#3c3f45] rounded transition-colors flex-shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive-foreground" />
-                      </button>
-                    </div>
-                  ))}
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <FileUploadBox category="construction" />
+                  <FileUploadBox category="architectural" />
+                  <FileUploadBox category="other" />
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No files added to this project yet
-                </p>
-              )}
+              </div>
 
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-2">
