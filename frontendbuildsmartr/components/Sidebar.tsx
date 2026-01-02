@@ -19,7 +19,6 @@ type SidebarProps = {
 export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: SidebarProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl)
   const [firstName, setFirstName] = useState<string | null>(initialFirstName)
-  const [showDropdown, setShowDropdown] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -342,11 +341,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
       {/* Bottom - User Account */}
       <div className={`w-full ${isExpandedView ? 'px-3' : 'px-2'} border-t border-border pt-4`}>
-        <div
-          className="relative"
-          onMouseEnter={() => setShowDropdown(true)}
-          onMouseLeave={() => setShowDropdown(false)}
-        >
+        <div className="relative group/profile">
           <Link href="/account" onClick={closeMobileMenu}>
             <motion.div
               whileHover={{ backgroundColor: "#3c3f45" }}
@@ -371,28 +366,25 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             </motion.div>
           </Link>
 
-          <AnimatePresence>
-            {showDropdown && (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 5 }}
-                transition={{ duration: 0.15 }}
-                className={`absolute ${isExpandedView ? 'left-0 right-0 bottom-full mb-1' : 'left-full bottom-0 ml-2'} bg-[#2b2d31] border border-border rounded-lg shadow-lg py-1 min-w-[120px] z-[60]`}
-              >
-                <button
-                  onClick={() => {
-                    handleLogout()
-                    closeMobileMenu()
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-[#3c3f45] transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Logout dropdown - shows on hover using CSS */}
+          <div
+            className={`
+              absolute opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-150
+              ${isExpandedView ? 'left-0 right-0 bottom-full mb-1' : 'left-full top-1/2 -translate-y-1/2 ml-2'}
+              bg-[#2b2d31] border border-border rounded-lg shadow-lg py-1 min-w-[120px] z-[60]
+            `}
+          >
+            <button
+              onClick={() => {
+                handleLogout()
+                closeMobileMenu()
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-[#3c3f45] transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
         </div>
       </div>
     </>
@@ -454,9 +446,10 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
       {/* Desktop Sidebar */}
       <aside 
-        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col py-4 z-50 transition-all duration-300 ease-in-out overflow-x-hidden ${
+        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col py-4 z-50 transition-all duration-300 ease-in-out overflow-y-auto ${
           isExpanded ? 'w-64' : 'w-20'
         }`}
+        style={{ overflow: isExpanded ? 'hidden auto' : 'visible' }}
       >
         {sidebarContent(isExpanded)}
       </aside>

@@ -1,9 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
-const AZURE_CLIENT_ID = process.env.AZURE_CLIENT_ID!;
-const AZURE_CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET!;
-const AZURE_TENANT_ID = process.env.AZURE_TENANT_ID || "common";
+const AZURE_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID!;
+const AZURE_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET!;
+const AZURE_TENANT_ID = process.env.MICROSOFT_TENANT_ID || "common";
 const AZURE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
   ? `${process.env.NEXT_PUBLIC_APP_URL}/api/email/outlook/callback`
   : "http://localhost:3000/api/email/outlook/callback";
