@@ -9,8 +9,8 @@ interface ProjectContextType {
   currentChatId: string | null
   generalChats: GeneralChat[]
   currentGeneralChatId: string | null
-  createProject: (name: string, description: string, files: ProjectFile[]) => Project
-  updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'description'>>) => void
+  createProject: (name: string, description: string, companyAddress: string, tags: string[], files: ProjectFile[]) => Project
+  updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'description' | 'companyAddress' | 'tags'>>) => void
   deleteProject: (id: string) => void
   setCurrentProject: (project: Project | null) => void
   addFilesToProject: (projectId: string, files: ProjectFile[]) => void
@@ -38,11 +38,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [generalChats, setGeneralChats] = useState<GeneralChat[]>([])
   const [currentGeneralChatId, setCurrentGeneralChatId] = useState<string | null>(null)
 
-  const createProject = useCallback((name: string, description: string, files: ProjectFile[]): Project => {
+  const createProject = useCallback((name: string, description: string, companyAddress: string, tags: string[], files: ProjectFile[]): Project => {
     const newProject: Project = {
       id: crypto.randomUUID(),
       name,
       description,
+      companyAddress,
+      tags,
       files,
       chats: [],
       createdAt: new Date(),

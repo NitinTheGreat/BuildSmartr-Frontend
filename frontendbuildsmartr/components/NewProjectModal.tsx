@@ -23,6 +23,9 @@ type CategoryFiles = Record<FileCategory, CategoryFile>
 export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
+  const [companyAddress, setCompanyAddress] = useState("")
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
   const [categoryFiles, setCategoryFiles] = useState<CategoryFiles>({
     construction: { file: null, isDragging: false },
     architectural: { file: null, isDragging: false },
@@ -86,6 +89,21 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
     }))
   }
 
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const trimmedTag = tagInput.trim()
+      if (trimmedTag && !tags.includes(trimmedTag)) {
+        setTags([...tags, trimmedTag])
+        setTagInput("")
+      }
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove))
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
@@ -94,11 +112,14 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
       .map(cf => cf.file)
       .filter((f): f is ProjectFile => f !== null)
 
-    const project = createProject(name.trim(), description.trim(), files)
+    const project = createProject(name.trim(), description.trim(), companyAddress.trim(), tags, files)
     
     // Reset form
     setName("")
     setDescription("")
+    setCompanyAddress("")
+    setTags([])
+    setTagInput("")
     setCategoryFiles({
       construction: { file: null, isDragging: false },
       architectural: { file: null, isDragging: false },
@@ -210,10 +231,10 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-[#2b2d31] border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] bg-[#2b2d31] border border-border rounded-xl shadow-2xl z-50 flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
               <h2 className="text-lg font-semibold text-foreground">New Project</h2>
               <button
                 onClick={onClose}
@@ -224,7 +245,7 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
               {/* Project Name */}
               <div>
                 <label htmlFor="projectName" className="block text-sm font-medium text-foreground mb-2">
@@ -255,6 +276,58 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                   rows={3}
                   className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none"
                 />
+              </div>
+
+              {/* Company Address */}
+              <div>
+                <label htmlFor="companyAddress" className="block text-sm font-medium text-foreground mb-2">
+                  Company Address
+                  <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                </label>
+                <input
+                  id="companyAddress"
+                  type="text"
+                  value={companyAddress}
+                  onChange={(e) => setCompanyAddress(e.target.value)}
+                  placeholder="Enter company address..."
+                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label htmlFor="tags" className="block text-sm font-medium text-foreground mb-2">
+                  Tags
+                  <span className="text-muted-foreground font-normal ml-1">(press Enter to add)</span>
+                </label>
+                <input
+                  id="tags"
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  placeholder="Type a tag and press Enter..."
+                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-accent/20 text-accent text-sm rounded-md"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="hover:text-red-400 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* File Upload - 3 Categories */}

@@ -39,6 +39,8 @@ export interface Project {
   id: string
   name: string
   description: string
+  companyAddress: string
+  tags: string[]
   files: ProjectFile[]
   chats: ProjectChat[]
   createdAt: Date
