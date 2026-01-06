@@ -2,10 +2,10 @@
 
 import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Upload, File, Trash2, HardHat, Ruler, FileText } from "lucide-react"
+import { X, Upload, File, Trash2, HardHat, Ruler, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useProjects } from "@/contexts/ProjectContext"
-import type { ProjectFile, FileCategory } from "@/types/project"
+import type { FileCategory } from "@/types/project"
 import { useRouter } from "next/navigation"
 
 interface NewProjectModalProps {
@@ -13,12 +13,13 @@ interface NewProjectModalProps {
   onClose: () => void
 }
 
-interface CategoryFile {
-  file: ProjectFile | null
+interface CategoryFileState {
+  file: File | null
+  preview: { name: string; size: number; type: string } | null
   isDragging: boolean
 }
 
-type CategoryFiles = Record<FileCategory, CategoryFile>
+type CategoryFiles = Record<FileCategory, CategoryFileState>
 
 export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
   const [name, setName] = useState("")
@@ -26,10 +27,11 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
   const [companyAddress, setCompanyAddress] = useState("")
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [categoryFiles, setCategoryFiles] = useState<CategoryFiles>({
-    construction: { file: null, isDragging: false },
-    architectural: { file: null, isDragging: false },
-    other: { file: null, isDragging: false },
+    construction: { file: null, preview: null, isDragging: false },
+    architectural: { file: null, preview: null, isDragging: false },
+    other: { file: null, preview: null, isDragging: false },
   })
   const fileInputRefs = {
     construction: useRef<HTMLInputElement>(null),
@@ -43,17 +45,14 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
     if (!selectedFiles || selectedFiles.length === 0) return
     
     const file = selectedFiles[0]
-    const newFile: ProjectFile = {
-      id: crypto.randomUUID(),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      category,
-    }
     
     setCategoryFiles(prev => ({
       ...prev,
-      [category]: { ...prev[category], file: newFile }
+      [category]: { 
+        file,
+        preview: { name: file.name, size: file.size, type: file.type },
+        isDragging: false 
+      }
     }))
   }
 
@@ -85,7 +84,7 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
   const removeFile = (category: FileCategory) => {
     setCategoryFiles(prev => ({
       ...prev,
-      [category]: { ...prev[category], file: null }
+      [category]: { file: null, preview: null, isDragging: false }
     }))
   }
 
@@ -104,31 +103,40 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
     setTags(tags.filter(tag => tag !== tagToRemove))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim() || isSubmitting) return
 
-    const files: ProjectFile[] = Object.values(categoryFiles)
-      .map(cf => cf.file)
-      .filter((f): f is ProjectFile => f !== null)
+    setIsSubmitting(true)
+    
+    try {
+      // Collect actual File objects
+      const files: File[] = Object.values(categoryFiles)
+        .map(cf => cf.file)
+        .filter((f): f is File => f !== null)
 
-    const project = createProject(name.trim(), description.trim(), companyAddress.trim(), tags, files)
-    
-    // Reset form
-    setName("")
-    setDescription("")
-    setCompanyAddress("")
-    setTags([])
-    setTagInput("")
-    setCategoryFiles({
-      construction: { file: null, isDragging: false },
-      architectural: { file: null, isDragging: false },
-      other: { file: null, isDragging: false },
-    })
-    onClose()
-    
-    // Navigate to the new project
-    router.push(`/project/${project.id}`)
+      const project = await createProject(name.trim(), description.trim(), companyAddress.trim(), tags, files)
+      
+      // Reset form
+      setName("")
+      setDescription("")
+      setCompanyAddress("")
+      setTags([])
+      setTagInput("")
+      setCategoryFiles({
+        construction: { file: null, preview: null, isDragging: false },
+        architectural: { file: null, preview: null, isDragging: false },
+        other: { file: null, preview: null, isDragging: false },
+      })
+      onClose()
+      
+      // Navigate to the new project
+      router.push(`/project/${project.id}`)
+    } catch (error) {
+      console.error("Failed to create project:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -157,21 +165,21 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
 
   const FileUploadBox = ({ category }: { category: FileCategory }) => {
     const config = categoryConfig[category]
-    const { file, isDragging } = categoryFiles[category]
+    const { preview, isDragging } = categoryFiles[category]
 
     return (
       <div className="flex-1">
         <label className="block text-xs font-medium text-foreground mb-1.5">
           {config.label}
         </label>
-        {file ? (
+        {preview ? (
           <div className="border border-border rounded-lg p-3 bg-[#1f2121]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 <File className="w-4 h-4 text-accent flex-shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm text-foreground truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                  <p className="text-sm text-foreground truncate">{preview.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(preview.size)}</p>
                 </div>
               </div>
               <button
@@ -350,16 +358,24 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                   type="button"
                   variant="outline"
                   onClick={onClose}
+                  disabled={isSubmitting}
                   className="bg-transparent border-border hover:bg-[#3c3f45]"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!name.trim()}
+                  disabled={!name.trim() || isSubmitting}
                   className="bg-accent hover:bg-accent-strong text-background"
                 >
-                  Create Project
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Project"
+                  )}
                 </Button>
               </div>
             </form>

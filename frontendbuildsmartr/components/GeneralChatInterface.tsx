@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Sparkles, Mic, Globe, Mail, Quote, FileText, ChevronDown, X, MessageSquare } from "lucide-react"
 import { useProjects } from "@/contexts/ProjectContext"
-import type { ChatMessage, SearchMode } from "@/types/project"
+import type { SearchMode } from "@/types/project"
 import { SearchInterface } from "./SearchInterface"
 
 interface SearchModeOption {
@@ -27,6 +27,7 @@ export function GeneralChatInterface() {
   const [query, setQuery] = useState("")
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -101,47 +102,50 @@ export function GeneralChatInterface() {
     return option?.label || mode
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim()) return
+    if (!query.trim() || isSubmitting) return
 
-    let chatId = currentGeneralChatId
-    if (!chatId) {
-      const newChat = createGeneralChat(query.trim().slice(0, 50))
-      chatId = newChat.id
-    }
-
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: query.trim(),
-      timestamp: new Date(),
-      searchModes: selectedModes.length > 0 ? selectedModes : undefined,
-    }
-
-    addMessageToGeneralChat(chatId, userMessage)
-
-    // Update chat title if it's the first message
-    const chat = generalChats.find(c => c.id === chatId)
-    if (chat && chat.messages.length === 0) {
-      updateGeneralChatTitle(chatId, query.trim().slice(0, 50))
-    }
-
-    setQuery("")
-
-    // Simulate AI response
-    setTimeout(() => {
-      const modesText = selectedModes.length > 0 
-        ? `Using ${selectedModes.join(', ')} mode(s), ` 
-        : ''
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `${modesText}I understand you're asking about "${query.trim()}". How can I help you further?`,
-        timestamp: new Date(),
+    setIsSubmitting(true)
+    const currentQuery = query.trim()
+    
+    try {
+      let chatId = currentGeneralChatId
+      if (!chatId) {
+        const newChat = await createGeneralChat(currentQuery.slice(0, 50))
+        chatId = newChat.id
       }
-      addMessageToGeneralChat(chatId!, assistantMessage)
-    }, 1000)
+
+      const userMessage = {
+        role: 'user' as const,
+        content: currentQuery,
+        searchModes: selectedModes.length > 0 ? selectedModes : undefined,
+      }
+
+      await addMessageToGeneralChat(chatId, userMessage)
+
+      // Update chat title if it's the first message
+      const chat = generalChats.find(c => c.id === chatId)
+      if (chat && chat.messages.length === 0) {
+        await updateGeneralChatTitle(chatId, currentQuery.slice(0, 50))
+      }
+
+      setQuery("")
+
+      // Simulate AI response
+      setTimeout(async () => {
+        const modesText = selectedModes.length > 0 
+          ? `Using ${selectedModes.join(', ')} mode(s), ` 
+          : ''
+        const assistantMessage = {
+          role: 'assistant' as const,
+          content: `${modesText}I understand you're asking about "${currentQuery}". How can I help you further?`,
+        }
+        await addMessageToGeneralChat(chatId!, assistantMessage)
+      }, 1000)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // If no current chat, show the welcome screen with SearchInterface

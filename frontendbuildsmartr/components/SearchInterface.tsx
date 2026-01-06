@@ -27,6 +27,7 @@ export function SearchInterface() {
   const [query, setQuery] = useState("")
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -78,40 +79,43 @@ export function SearchInterface() {
     setSelectedModes(prev => prev.filter(m => m !== mode))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim()) return
+    if (!query.trim() || isSubmitting) return
 
-    // Create a new general chat
-    const chat = createGeneralChat(query.trim().slice(0, 50))
+    setIsSubmitting(true)
+    try {
+      const currentQuery = query.trim()
+      
+      // Create a new general chat
+      const chat = await createGeneralChat(currentQuery.slice(0, 50))
 
-    // Add the user message
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: query.trim(),
-      timestamp: new Date(),
-      searchModes: selectedModes.length > 0 ? selectedModes : undefined,
-    }
-    addMessageToGeneralChat(chat.id, userMessage)
-    updateGeneralChatTitle(chat.id, query.trim().slice(0, 50))
-
-    // Simulate AI response
-    setTimeout(() => {
-      const modesText = selectedModes.length > 0 
-        ? `Using ${selectedModes.join(', ')} mode(s), ` 
-        : ''
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `${modesText}I understand you're asking about "${query.trim()}". How can I help you further?`,
-        timestamp: new Date(),
+      // Add the user message
+      const userMessage = {
+        role: 'user' as const,
+        content: currentQuery,
+        searchModes: selectedModes.length > 0 ? selectedModes : undefined,
       }
-      addMessageToGeneralChat(chat.id, assistantMessage)
-    }, 1000)
+      await addMessageToGeneralChat(chat.id, userMessage)
+      await updateGeneralChatTitle(chat.id, currentQuery.slice(0, 50))
 
-    // Navigate to chat page
-    router.push('/chat')
+      // Simulate AI response
+      setTimeout(async () => {
+        const modesText = selectedModes.length > 0 
+          ? `Using ${selectedModes.join(', ')} mode(s), ` 
+          : ''
+        const assistantMessage = {
+          role: 'assistant' as const,
+          content: `${modesText}I understand you're asking about "${currentQuery}". How can I help you further?`,
+        }
+        await addMessageToGeneralChat(chat.id, assistantMessage)
+      }, 1000)
+
+      // Navigate to chat page
+      router.push('/chat')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const getModeIcon = (mode: SearchMode) => {

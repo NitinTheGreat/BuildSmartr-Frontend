@@ -7,6 +7,7 @@ const AZURE_TENANT_ID = process.env.MICROSOFT_TENANT_ID || "common";
 const AZURE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
   ? `${process.env.NEXT_PUBLIC_APP_URL}/api/email/outlook/callback`
   : "http://localhost:3000/api/email/outlook/callback";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -24,9 +25,9 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
 
-  if (!user || !user.email) {
+  if (!session?.access_token) {
     return NextResponse.redirect(new URL("/account?error=unauthorized", request.url));
   }
 
@@ -56,43 +57,26 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL("/account?error=token_exchange_failed", request.url));
     }
 
-    // Get user info from Microsoft Graph to get their email
-    const userInfoResponse = await fetch("https://graph.microsoft.com/v1.0/me", {
+    // Call backend to store the Outlook connection
+    const backendResponse = await fetch(`${BACKEND_URL}/api/user/connect/outlook`, {
+      method: "POST",
       headers: {
-        Authorization: `Bearer ${tokens.access_token}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
       },
+      body: JSON.stringify({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_in: tokens.expires_in,
+        token_type: tokens.token_type,
+        scope: tokens.scope,
+      }),
     });
 
-    const outlookUserInfo = await userInfoResponse.json();
-    const outlookEmail = outlookUserInfo.mail || outlookUserInfo.userPrincipalName;
-
-    // Store tokens in user_info table
-    const tokenData = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expires_in: tokens.expires_in,
-      token_type: tokens.token_type,
-      scope: tokens.scope,
-      obtained_at: new Date().toISOString(),
-    };
-
-    // Upsert to user_info table
-    const { error: upsertError } = await supabase
-      .from("user_info")
-      .upsert(
-        {
-          email: user.email,
-          outlook_email: outlookEmail,
-          outlook_token: tokenData,
-        },
-        {
-          onConflict: "email",
-        }
-      );
-
-    if (upsertError) {
-      console.error("[Outlook OAuth] Database error:", upsertError);
-      return NextResponse.redirect(new URL("/account?error=database_error", request.url));
+    if (!backendResponse.ok) {
+      const errorData = await backendResponse.json().catch(() => ({}));
+      console.error("[Outlook OAuth] Backend error:", errorData);
+      return NextResponse.redirect(new URL("/account?error=backend_error", request.url));
     }
 
     return NextResponse.redirect(new URL("/account?success=outlook_connected", request.url));

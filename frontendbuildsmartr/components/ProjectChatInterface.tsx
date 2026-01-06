@@ -36,6 +36,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const [editDescription, setEditDescription] = useState(project.description)
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -161,8 +162,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     setIsEditingDescription(false)
   }
 
-  const handleNewChat = () => {
-    createChat(project.id)
+  const handleNewChat = async () => {
+    await createChat(project.id)
   }
 
   const handleSelectChat = (chatId: string) => {
@@ -173,53 +174,55 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     setCurrentChatId(null)
   }
 
-  const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
+  const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    deleteChat(project.id, chatId)
+    await deleteChat(project.id, chatId)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim()) return
+    if (!query.trim() || isSubmitting) return
 
-    // If no current chat, create one
-    let chatId = currentChatId
-    if (!chatId) {
-      const newChat = createChat(project.id, query.trim().slice(0, 50))
-      chatId = newChat.id
-    }
-
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: query.trim(),
-      timestamp: new Date(),
-      searchModes: selectedModes.length > 0 ? selectedModes : undefined,
-    }
-
-    addMessageToChat(project.id, chatId, userMessage)
-
-    // Update chat title if it's the first message
-    const chat = project.chats.find(c => c.id === chatId)
-    if (chat && chat.messages.length === 0) {
-      updateChatTitle(project.id, chatId, query.trim().slice(0, 50))
-    }
-
-    setQuery("")
-
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      const modesText = selectedModes.length > 0 
-        ? `Using ${selectedModes.join(', ')} mode(s), ` 
-        : ''
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: `${modesText}I understand you're asking about "${query.trim()}" in the context of your project "${project.name}". ${project.description ? `Based on your project description: "${project.description}"` : ''} ${project.files.length > 0 ? `I can see you have ${project.files.length} file(s) attached to this project.` : ''} How can I help you further?`,
-        timestamp: new Date(),
+    setIsSubmitting(true)
+    try {
+      // If no current chat, create one
+      let chatId = currentChatId
+      if (!chatId) {
+        const newChat = await createChat(project.id, query.trim().slice(0, 50))
+        chatId = newChat.id
       }
-      addMessageToChat(project.id, chatId!, assistantMessage)
-    }, 1000)
+
+      const userMessage = {
+        role: 'user' as const,
+        content: query.trim(),
+        searchModes: selectedModes.length > 0 ? selectedModes : undefined,
+      }
+
+      await addMessageToChat(project.id, chatId, userMessage)
+
+      // Update chat title if it's the first message
+      const chat = project.chats.find(c => c.id === chatId)
+      if (chat && chat.messages.length === 0) {
+        await updateChatTitle(project.id, chatId, query.trim().slice(0, 50))
+      }
+
+      const currentQuery = query.trim()
+      setQuery("")
+
+      // Simulate AI response (replace with actual API call)
+      setTimeout(async () => {
+        const modesText = selectedModes.length > 0 
+          ? `Using ${selectedModes.join(', ')} mode(s), ` 
+          : ''
+        const assistantMessage = {
+          role: 'assistant' as const,
+          content: `${modesText}I understand you're asking about "${currentQuery}" in the context of your project "${project.name}". ${project.description ? `Based on your project description: "${project.description}"` : ''} ${project.files.length > 0 ? `I can see you have ${project.files.length} file(s) attached to this project.` : ''} How can I help you further?`,
+        }
+        await addMessageToChat(project.id, chatId!, assistantMessage)
+      }, 1000)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const getCategoryIcon = (category: string) => {

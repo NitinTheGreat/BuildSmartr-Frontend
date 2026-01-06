@@ -15,9 +15,9 @@ interface EditFilesModalProps {
 }
 
 interface CategoryFile {
-  file: ProjectFile | null
+  existingFile: ProjectFile | null  // Existing file from server
+  newFile: File | null              // New file to upload
   isDragging: boolean
-  isNew: boolean
 }
 
 type CategoryFiles = Record<FileCategory, CategoryFile>
@@ -25,14 +25,14 @@ type CategoryFiles = Record<FileCategory, CategoryFile>
 export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: EditFilesModalProps) {
   const initializeCategoryFiles = (): CategoryFiles => {
     const initial: CategoryFiles = {
-      construction: { file: null, isDragging: false, isNew: false },
-      architectural: { file: null, isDragging: false, isNew: false },
-      other: { file: null, isDragging: false, isNew: false },
+      construction: { existingFile: null, newFile: null, isDragging: false },
+      architectural: { existingFile: null, newFile: null, isDragging: false },
+      other: { existingFile: null, newFile: null, isDragging: false },
     }
     
     currentFiles.forEach(file => {
       if (file.category && initial[file.category]) {
-        initial[file.category] = { file, isDragging: false, isNew: false }
+        initial[file.category] = { existingFile: file, newFile: null, isDragging: false }
       }
     })
     
@@ -61,23 +61,16 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
     if (!selectedFiles || selectedFiles.length === 0) return
     
     const file = selectedFiles[0]
-    const newFile: ProjectFile = {
-      id: crypto.randomUUID(),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      category,
-    }
     
     // If there was an existing file, mark it for removal
-    const existingFile = categoryFiles[category].file
-    if (existingFile && !categoryFiles[category].isNew) {
+    const existingFile = categoryFiles[category].existingFile
+    if (existingFile) {
       setRemovedFileIds(prev => [...prev, existingFile.id])
     }
     
     setCategoryFiles(prev => ({
       ...prev,
-      [category]: { file: newFile, isDragging: false, isNew: true }
+      [category]: { existingFile: null, newFile: file, isDragging: false }
     }))
   }
 
@@ -107,30 +100,28 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
   }
 
   const removeFile = (category: FileCategory) => {
-    const existingFile = categoryFiles[category].file
-    if (existingFile && !categoryFiles[category].isNew) {
-      setRemovedFileIds(prev => [...prev, existingFile.id])
+    const cf = categoryFiles[category]
+    if (cf.existingFile) {
+      setRemovedFileIds(prev => [...prev, cf.existingFile!.id])
     }
     
     setCategoryFiles(prev => ({
       ...prev,
-      [category]: { file: null, isDragging: false, isNew: false }
+      [category]: { existingFile: null, newFile: null, isDragging: false }
     }))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Remove files that were marked for removal
-    removedFileIds.forEach(fileId => {
-      removeFileFromProject(projectId, fileId)
-    })
+    for (const fileId of removedFileIds) {
+      await removeFileFromProject(projectId, fileId)
+    }
     
-    // Add new files
-    const newFiles = Object.values(categoryFiles)
-      .filter(cf => cf.file && cf.isNew)
-      .map(cf => cf.file as ProjectFile)
-    
-    if (newFiles.length > 0) {
-      addFilesToProject(projectId, newFiles)
+    // Add new files by category
+    for (const [category, cf] of Object.entries(categoryFiles)) {
+      if (cf.newFile) {
+        await addFilesToProject(projectId, [cf.newFile], category)
+      }
     }
     
     onClose()
@@ -168,23 +159,27 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
 
   const FileUploadBox = ({ category }: { category: FileCategory }) => {
     const config = categoryConfig[category]
-    const { file, isDragging, isNew } = categoryFiles[category]
+    const { existingFile, newFile, isDragging } = categoryFiles[category]
+    const hasFile = existingFile || newFile
+    const isNew = !!newFile
+    const displayName = newFile?.name || existingFile?.name || ''
+    const displaySize = newFile?.size || existingFile?.size || 0
 
     return (
       <div className="flex-1">
         <label className="block text-xs font-medium text-foreground mb-1.5">
           {config.label}
         </label>
-        {file ? (
+        {hasFile ? (
           <div className={`border rounded-lg p-3 ${isNew ? 'bg-accent/10 border-accent/30' : 'bg-[#1f2121] border-border'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 <File className={`w-4 h-4 flex-shrink-0 ${isNew ? 'text-accent' : 'text-muted-foreground'}`} />
                 <div className="min-w-0">
-                  <p className="text-sm text-foreground truncate">{file.name}</p>
+                  <p className="text-sm text-foreground truncate">{displayName}</p>
                   <div className="flex items-center gap-2">
                     {isNew && <span className="text-xs text-accent">New</span>}
-                    <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(displaySize)}</p>
                   </div>
                 </div>
               </div>
