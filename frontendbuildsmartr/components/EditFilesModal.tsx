@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, File, Trash2, HardHat, Ruler, FileText } from "lucide-react"
+import { X, File, Trash2, HardHat, Ruler, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useProjects } from "@/contexts/ProjectContext"
 import type { ProjectFile, FileCategory } from "@/types/project"
@@ -15,8 +15,8 @@ interface EditFilesModalProps {
 }
 
 interface CategoryFile {
-  existingFile: ProjectFile | null  // Existing file from server
-  newFile: File | null              // New file to upload
+  existingFiles: ProjectFile[]  // ALL existing files from server in this category
+  newFile: File | null          // New file to upload (replaces all existing)
   isDragging: boolean
 }
 
@@ -25,14 +25,15 @@ type CategoryFiles = Record<FileCategory, CategoryFile>
 export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: EditFilesModalProps) {
   const initializeCategoryFiles = (): CategoryFiles => {
     const initial: CategoryFiles = {
-      construction: { existingFile: null, newFile: null, isDragging: false },
-      architectural: { existingFile: null, newFile: null, isDragging: false },
-      other: { existingFile: null, newFile: null, isDragging: false },
+      construction: { existingFiles: [], newFile: null, isDragging: false },
+      architectural: { existingFiles: [], newFile: null, isDragging: false },
+      other: { existingFiles: [], newFile: null, isDragging: false },
     }
     
+    // Group all files by category
     currentFiles.forEach(file => {
       if (file.category && initial[file.category]) {
-        initial[file.category] = { existingFile: file, newFile: null, isDragging: false }
+        initial[file.category].existingFiles.push(file)
       }
     })
     
@@ -41,6 +42,7 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
 
   const [categoryFiles, setCategoryFiles] = useState<CategoryFiles>(initializeCategoryFiles)
   const [removedFileIds, setRemovedFileIds] = useState<string[]>([])
+  const [isSaving, setIsSaving] = useState(false)
   
   const fileInputRefs = {
     construction: useRef<HTMLInputElement>(null),
@@ -62,15 +64,15 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
     
     const file = selectedFiles[0]
     
-    // If there was an existing file, mark it for removal
-    const existingFile = categoryFiles[category].existingFile
-    if (existingFile) {
-      setRemovedFileIds(prev => [...prev, existingFile.id])
+    // Mark ALL existing files in this category for removal
+    const existingFiles = categoryFiles[category].existingFiles
+    if (existingFiles.length > 0) {
+      setRemovedFileIds(prev => [...prev, ...existingFiles.map(f => f.id)])
     }
     
     setCategoryFiles(prev => ({
       ...prev,
-      [category]: { existingFile: null, newFile: file, isDragging: false }
+      [category]: { existingFiles: [], newFile: file, isDragging: false }
     }))
   }
 
@@ -101,30 +103,40 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
 
   const removeFile = (category: FileCategory) => {
     const cf = categoryFiles[category]
-    if (cf.existingFile) {
-      setRemovedFileIds(prev => [...prev, cf.existingFile!.id])
+    // Mark ALL existing files for removal
+    if (cf.existingFiles.length > 0) {
+      setRemovedFileIds(prev => [...prev, ...cf.existingFiles.map(f => f.id)])
     }
     
     setCategoryFiles(prev => ({
       ...prev,
-      [category]: { existingFile: null, newFile: null, isDragging: false }
+      [category]: { existingFiles: [], newFile: null, isDragging: false }
     }))
   }
 
   const handleSave = async () => {
-    // Remove files that were marked for removal
-    for (const fileId of removedFileIds) {
-      await removeFileFromProject(projectId, fileId)
-    }
+    if (isSaving) return
+    setIsSaving(true)
     
-    // Add new files by category
-    for (const [category, cf] of Object.entries(categoryFiles)) {
-      if (cf.newFile) {
-        await addFilesToProject(projectId, [cf.newFile], category)
+    try {
+      // Remove files that were marked for removal
+      for (const fileId of removedFileIds) {
+        await removeFileFromProject(projectId, fileId)
       }
+      
+      // Add new files by category
+      for (const [category, cf] of Object.entries(categoryFiles)) {
+        if (cf.newFile) {
+          await addFilesToProject(projectId, [cf.newFile], category)
+        }
+      }
+      
+      onClose()
+    } catch (error) {
+      console.error('Failed to save files:', error)
+    } finally {
+      setIsSaving(false)
     }
-    
-    onClose()
   }
 
   const handleClose = () => {
@@ -159,11 +171,15 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
 
   const FileUploadBox = ({ category }: { category: FileCategory }) => {
     const config = categoryConfig[category]
-    const { existingFile, newFile, isDragging } = categoryFiles[category]
-    const hasFile = existingFile || newFile
+    const { existingFiles, newFile, isDragging } = categoryFiles[category]
+    // Show the most recent existing file if there's no new file
+    const latestExistingFile = existingFiles.length > 0 ? existingFiles[existingFiles.length - 1] : null
+    const hasFile = latestExistingFile || newFile
     const isNew = !!newFile
-    const displayName = newFile?.name || existingFile?.name || ''
-    const displaySize = newFile?.size || existingFile?.size || 0
+    const displayName = newFile?.name || latestExistingFile?.name || ''
+    const displaySize = newFile?.size || latestExistingFile?.size || 0
+    // Show count if there are multiple existing files
+    const extraFilesCount = existingFiles.length > 1 ? existingFiles.length - 1 : 0
 
     return (
       <div className="flex-1">
@@ -180,6 +196,9 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
                   <div className="flex items-center gap-2">
                     {isNew && <span className="text-xs text-accent">New</span>}
                     <p className="text-xs text-muted-foreground">{formatFileSize(displaySize)}</p>
+                    {extraFilesCount > 0 && !isNew && (
+                      <span className="text-xs text-yellow-500">+{extraFilesCount} old</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -274,15 +293,24 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
                   type="button"
                   variant="outline"
                   onClick={handleClose}
+                  disabled={isSaving}
                   className="bg-transparent border-border hover:bg-[#3c3f45]"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSave}
-                  className="bg-accent hover:bg-accent-strong text-background"
+                  disabled={isSaving}
+                  className="bg-accent hover:bg-accent-strong text-background gap-2"
                 >
-                  Save Changes
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </Button>
               </div>
             </div>

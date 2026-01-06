@@ -4,9 +4,11 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown } from "lucide-react"
-import type { Project, ChatMessage, ProjectChat, SearchMode } from "@/types/project"
+import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye } from "lucide-react"
+import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile } from "@/types/project"
 import { EditFilesModal } from "./EditFilesModal"
+import { ShareProjectModal } from "./ShareProjectModal"
+import { PDFPreviewModal } from "./PDFPreviewModal"
 import { useProjects } from "@/contexts/ProjectContext"
 
 interface SearchModeOption {
@@ -30,6 +32,8 @@ interface ProjectChatInterfaceProps {
 export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const [query, setQuery] = useState("")
   const [isEditFilesModalOpen, setIsEditFilesModalOpen] = useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [previewFile, setPreviewFile] = useState<ProjectFile | null>(null)
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [editName, setEditName] = useState(project.name)
@@ -45,7 +49,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
   const { 
     currentChatId, 
-    setCurrentChatId, 
+    setCurrentChatId,
+    loadChatMessages,
     createChat, 
     addMessageToChat,
     updateChatTitle,
@@ -166,8 +171,10 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     await createChat(project.id)
   }
 
-  const handleSelectChat = (chatId: string) => {
+  const handleSelectChat = async (chatId: string) => {
     setCurrentChatId(chatId)
+    // Load messages for the selected chat
+    await loadChatMessages(project.id, chatId)
   }
 
   const handleBackToProject = () => {
@@ -236,6 +243,21 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     }
   }
 
+  const handleFileClick = (file: ProjectFile) => {
+    // Open preview for PDFs and images
+    const isPDF = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    const isImage = file.type.startsWith("image/")
+    if ((isPDF || isImage) && file.url) {
+      setPreviewFile(file)
+    }
+  }
+
+  const isPreviewable = (file: ProjectFile) => {
+    const isPDF = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    const isImage = file.type.startsWith("image/")
+    return (isPDF || isImage) && file.url
+  }
+
   // Chat view - when a chat is selected
   if (isInChatView) {
     return (
@@ -245,6 +267,17 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           onClose={() => setIsEditFilesModalOpen(false)}
           projectId={project.id}
           currentFiles={project.files}
+        />
+        <ShareProjectModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          projectId={project.id}
+          projectName={project.name}
+        />
+        <PDFPreviewModal
+          isOpen={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+          file={previewFile}
         />
         
         <div className="min-h-screen flex flex-col">
@@ -490,6 +523,17 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         projectId={project.id}
         currentFiles={project.files}
       />
+      <ShareProjectModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        projectId={project.id}
+        projectName={project.name}
+      />
+      <PDFPreviewModal
+        isOpen={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+        file={previewFile}
+      />
       
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
         {/* Project Header - Editable */}
@@ -525,6 +569,13 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                   className="p-2 hover:bg-[#3c3f45] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <Pencil className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <button 
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="p-2 hover:bg-[#3c3f45] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Share project"
+                >
+                  <Share2 className="w-4 h-4 text-muted-foreground" />
                 </button>
               </div>
             )}
@@ -578,15 +629,26 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
             <span className="text-sm font-medium text-foreground">
               Project Files ({project.files.length})
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditFilesModalOpen(true)}
-              className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
-            >
-              <FileEdit className="w-4 h-4" />
-              Edit Files
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsShareModalOpen(true)}
+                className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                Share
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditFilesModalOpen(true)}
+                className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+              >
+                <FileEdit className="w-4 h-4" />
+                Edit Files
+              </Button>
+            </div>
           </div>
           
           {project.files.length > 0 ? (
@@ -594,10 +656,19 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               {project.files.map(file => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-2 px-3 py-2 bg-[#2b2d31] border border-border rounded-lg"
+                  onClick={() => handleFileClick(file)}
+                  className={`flex items-center gap-2 px-3 py-2 bg-[#2b2d31] border border-border rounded-lg ${
+                    isPreviewable(file) 
+                      ? 'cursor-pointer hover:bg-[#3c3f45] hover:border-accent/50 transition-colors' 
+                      : ''
+                  }`}
+                  title={isPreviewable(file) ? 'Click to preview' : undefined}
                 >
                   {getCategoryIcon(file.category)}
                   <span className="text-sm text-foreground">{file.name}</span>
+                  {isPreviewable(file) && (
+                    <Eye className="w-3 h-3 text-muted-foreground" />
+                  )}
                 </div>
               ))}
             </div>

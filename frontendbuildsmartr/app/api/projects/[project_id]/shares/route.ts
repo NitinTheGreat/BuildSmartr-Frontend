@@ -40,6 +40,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   try {
     const body = await request.json()
+    console.log("[api/shares] POST body:", JSON.stringify(body))
     const response = await fetch(`${BACKEND_URL}/api/projects/${project_id}/shares`, {
       method: "POST",
       headers: {
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       body: JSON.stringify(body),
     })
     const data = await response.json().catch(() => ({}))
+    console.log("[api/shares] Backend response:", response.status, JSON.stringify(data))
     return NextResponse.json(data, { status: response.status })
   } catch {
     return NextResponse.json({ error: "Backend unavailable" }, { status: 503 })

@@ -104,6 +104,7 @@ interface ProjectContextType {
   error: string | null
   // Project management
   loadProjects: () => Promise<void>
+  loadProject: (projectId: string) => Promise<Project | null>
   createProject: (name: string, description: string, companyAddress: string, tags: string[], files: File[]) => Promise<Project>
   updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'description' | 'companyAddress' | 'tags'>>) => Promise<void>
   deleteProject: (id: string) => Promise<void>
@@ -114,6 +115,7 @@ interface ProjectContextType {
   // Project Chat management
   createChat: (projectId: string, title?: string) => Promise<ProjectChat>
   setCurrentChatId: (chatId: string | null) => void
+  loadChatMessages: (projectId: string, chatId: string) => Promise<void>
   addMessageToChat: (projectId: string, chatId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => Promise<ChatMessage>
   updateChatTitle: (projectId: string, chatId: string, title: string) => Promise<void>
   deleteChat: (projectId: string, chatId: string) => Promise<void>
@@ -198,6 +200,23 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setError(err instanceof Error ? err.message : "Failed to load projects")
     } finally {
       setIsLoading(false)
+    }
+  }, [])
+
+  const loadProject = useCallback(async (projectId: string): Promise<Project | null> => {
+    try {
+      setError(null)
+      const data = await fetchApi<ProjectResponse>(`/projects/${projectId}`)
+      const project = toProject(data)
+      
+      // Update the project in the list
+      setProjects(prev => prev.map(p => p.id === projectId ? project : p))
+      
+      return project
+    } catch (err) {
+      console.error("Failed to load project:", err)
+      setError(err instanceof Error ? err.message : "Failed to load project")
+      return null
     }
   }, [])
 
@@ -407,6 +426,36 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       console.error("Failed to create chat:", err)
       setError(err instanceof Error ? err.message : "Failed to create chat")
       throw err
+    }
+  }, [currentProject])
+
+  const loadChatMessages = useCallback(async (projectId: string, chatId: string) => {
+    try {
+      setError(null)
+      const data = await fetchApi<MessageResponse[]>(`/chats/${chatId}/messages`)
+      const messages = data.map(toMessage)
+      
+      const updateChats = (chats: ProjectChat[]) => 
+        chats.map(c => c.id === chatId 
+          ? { ...c, messages }
+          : c
+        )
+      
+      setProjects(prev => prev.map(p => 
+        p.id === projectId 
+          ? { ...p, chats: updateChats(p.chats) }
+          : p
+      ))
+      
+      if (currentProject?.id === projectId) {
+        setCurrentProject(prev => prev 
+          ? { ...prev, chats: updateChats(prev.chats) }
+          : null
+        )
+      }
+    } catch (err) {
+      console.error("Failed to load chat messages:", err)
+      setError(err instanceof Error ? err.message : "Failed to load messages")
     }
   }, [currentProject])
 
@@ -630,6 +679,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       isLoading,
       error,
       loadProjects,
+      loadProject,
       createProject,
       updateProject,
       deleteProject,
@@ -638,6 +688,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       removeFileFromProject,
       createChat,
       setCurrentChatId,
+      loadChatMessages,
       addMessageToChat,
       updateChatTitle,
       deleteChat,

@@ -2,6 +2,16 @@ export type FileCategory = 'construction' | 'architectural' | 'other'
 
 export type SearchMode = 'web' | 'email' | 'quotes' | 'pdf'
 
+export type SharePermission = 'view' | 'edit'
+
+export interface ProjectShare {
+  id: string
+  projectId: string
+  sharedWithEmail: string
+  permission: SharePermission
+  createdAt: Date
+}
+
 export interface ProjectFile {
   id: string
   name: string
