@@ -9,26 +9,39 @@ import type {
   ProjectFileResponse
 } from "@/types/api"
 import { createClient } from "@/utils/supabase/client"
+import { OfflineModal } from "@/components/OfflineModal"
 
 // ============================================
 // Fetch Helper
 // ============================================
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  })
+  try {
+    const response = await fetch(`/api${endpoint}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+      ...options,
+    })
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Request failed" }))
-    throw new Error(error.error || response.statusText)
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Request failed" }))
+      // Check for backend unavailable error
+      if (response.status === 503 || error.error === "Backend unavailable") {
+        throw new Error("__CONNECTION_ERROR__")
+      }
+      throw new Error(error.error || response.statusText)
+    }
+
+    return response.json()
+  } catch (err) {
+    // Network error (offline, DNS failure, etc.)
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      throw new Error("__CONNECTION_ERROR__")
+    }
+    throw err
   }
-
-  return response.json()
 }
 
 // ============================================
@@ -61,20 +74,24 @@ function toProjectFile(res: ProjectFileResponse): ProjectFile {
 }
 
 function toProjectChat(res: ChatResponse): ProjectChat {
+  const messages = (res.messages || []).map(toMessage)
   return {
     id: res.id,
     title: res.title,
-    messages: (res.messages || []).map(toMessage),
+    messages,
+    messageCount: res.message_count ?? messages.length,
     createdAt: new Date(res.created_at),
     updatedAt: new Date(res.updated_at),
   }
 }
 
 function toGeneralChat(res: ChatResponse): GeneralChat {
+  const messages = (res.messages || []).map(toMessage)
   return {
     id: res.id,
     title: res.title,
-    messages: (res.messages || []).map(toMessage),
+    messages,
+    messageCount: res.message_count ?? messages.length,
     createdAt: new Date(res.created_at),
     updatedAt: new Date(res.updated_at),
   }
@@ -139,6 +156,23 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
+  const [showOfflineModal, setShowOfflineModal] = useState(false)
+
+  // Helper to handle connection errors
+  const handleError = useCallback((err: unknown, fallbackMessage: string) => {
+    if (err instanceof Error && err.message === "__CONNECTION_ERROR__") {
+      setShowOfflineModal(true)
+      return
+    }
+    console.error(fallbackMessage, err)
+    setError(err instanceof Error ? err.message : fallbackMessage)
+  }, [])
+
+  // Retry function for the offline modal
+  const handleRetry = useCallback(() => {
+    loadProjects()
+    loadGeneralChats()
+  }, [])
 
   // Load data on auth state change
   useEffect(() => {
@@ -196,12 +230,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const data = await fetchApi<ProjectResponse[]>("/projects")
       setProjects(data.map(toProject))
     } catch (err) {
-      console.error("Failed to load projects:", err)
-      setError(err instanceof Error ? err.message : "Failed to load projects")
+      handleError(err, "Failed to load projects")
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [handleError])
 
   const loadProject = useCallback(async (projectId: string): Promise<Project | null> => {
     try {
@@ -214,11 +247,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       
       return project
     } catch (err) {
-      console.error("Failed to load project:", err)
-      setError(err instanceof Error ? err.message : "Failed to load project")
+      handleError(err, "Failed to load project")
       return null
     }
-  }, [])
+  }, [handleError])
 
   const createProject = useCallback(async (
     name: string, 
@@ -437,7 +469,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       
       const updateChats = (chats: ProjectChat[]) => 
         chats.map(c => c.id === chatId 
-          ? { ...c, messages }
+          ? { ...c, messages, messageCount: messages.length }
           : c
         )
       
@@ -478,7 +510,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       
       const updateChats = (chats: ProjectChat[]) => 
         chats.map(c => c.id === chatId 
-          ? { ...c, messages: [...c.messages, newMessage], updatedAt: new Date() }
+          ? { ...c, messages: [...c.messages, newMessage], messageCount: c.messageCount + 1, updatedAt: new Date() }
           : c
         )
       
@@ -576,9 +608,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const data = await fetchApi<ChatResponse[]>("/chats")
       setGeneralChats(data.map(toGeneralChat))
     } catch (err) {
-      console.error("Failed to load general chats:", err)
+      handleError(err, "Failed to load general chats")
     }
-  }, [])
+  }, [handleError])
 
   const createGeneralChat = useCallback(async (title?: string): Promise<GeneralChat> => {
     try {
@@ -620,7 +652,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       
       setGeneralChats(prev => prev.map(c => 
         c.id === chatId 
-          ? { ...c, messages: [...c.messages, newMessage], updatedAt: new Date() }
+          ? { ...c, messages: [...c.messages, newMessage], messageCount: c.messageCount + 1, updatedAt: new Date() }
           : c
       ))
       
@@ -700,6 +732,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       deleteGeneralChat,
     }}>
       {children}
+      <OfflineModal
+        isOpen={showOfflineModal}
+        onClose={() => setShowOfflineModal(false)}
+        onRetry={handleRetry}
+        message="Unable to connect to the server. Please check your internet connection and try again."
+      />
     </ProjectContext.Provider>
   )
 }

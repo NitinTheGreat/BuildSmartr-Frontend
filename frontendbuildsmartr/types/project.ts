@@ -2,8 +2,18 @@ export type FileCategory = 'construction' | 'architectural' | 'other'
 
 export type SearchMode = 'web' | 'email' | 'quotes' | 'pdf'
 
-export type SharePermission = 'view' | 'edit'
+// SHARE FEATURE DISABLED - Uncomment to re-enable
+// export type SharePermission = 'view' | 'edit'
+// export interface ProjectShare {
+//   id: string
+//   projectId: string
+//   sharedWithEmail: string
+//   permission: SharePermission
+//   createdAt: Date
+// }
 
+// Placeholder types to prevent import errors
+export type SharePermission = 'view' | 'edit'
 export interface ProjectShare {
   id: string
   projectId: string
@@ -33,6 +43,7 @@ export interface ProjectChat {
   id: string
   title: string
   messages: ChatMessage[]
+  messageCount: number
   createdAt: Date
   updatedAt: Date
 }
@@ -41,6 +52,7 @@ export interface GeneralChat {
   id: string
   title: string
   messages: ChatMessage[]
+  messageCount: number
   createdAt: Date
   updatedAt: Date
 }

@@ -11,7 +11,8 @@ export interface ProjectResponse {
   permission: "owner" | "edit" | "view"
   files?: ProjectFileResponse[]
   chats?: ChatResponse[]
-  shares?: ShareResponse[]
+  // SHARE FEATURE DISABLED
+  // shares?: ShareResponse[]
   created_at: string
   updated_at: string
 }
@@ -34,6 +35,7 @@ export interface ChatResponse {
   title: string
   chat_type: "project" | "general"
   messages?: MessageResponse[]
+  message_count?: number
   created_at: string
   updated_at: string
 }
@@ -47,6 +49,16 @@ export interface MessageResponse {
   timestamp: string
 }
 
+// SHARE FEATURE DISABLED - Uncomment to re-enable
+// export interface ShareResponse {
+//   id: string
+//   project_id: string
+//   shared_with_email: string
+//   permission: "view" | "edit"
+//   created_at: string
+// }
+
+// Placeholder type to prevent import errors
 export interface ShareResponse {
   id: string
   project_id: string

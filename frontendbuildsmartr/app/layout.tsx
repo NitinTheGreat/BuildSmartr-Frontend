@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 // import { Analytics } from "@vercel/analytics/next"
 import { Sidebar } from "@/components/Sidebar"
+import { TopBar } from "@/components/TopBar"
 import { createClient } from "@/utils/supabase/server"
 import { ProjectProvider } from "@/contexts/ProjectContext"
 import "./globals.css"
@@ -20,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "BuildSmartr",
+  title: "IIVY",
   description: "AI-powered research assistant for smarter building decisions.",
   generator: "Next.js",
   icons: {

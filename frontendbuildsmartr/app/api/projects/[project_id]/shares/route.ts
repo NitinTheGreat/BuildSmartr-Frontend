@@ -1,3 +1,9 @@
+/*
+ * SHARE PROJECT FEATURE - TEMPORARILY DISABLED
+ * Uncomment to re-enable share API endpoints
+ */
+
+/*
 import { createClient } from "@/utils/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 
@@ -55,4 +61,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   } catch {
     return NextResponse.json({ error: "Backend unavailable" }, { status: 503 })
   }
+}
+*/
+
+// Placeholder exports - return 503 (feature disabled)
+import { NextResponse } from "next/server"
+
+export async function GET() {
+  return NextResponse.json({ error: "Share feature disabled" }, { status: 503 })
+}
+
+export async function POST() {
+  return NextResponse.json({ error: "Share feature disabled" }, { status: 503 })
 }

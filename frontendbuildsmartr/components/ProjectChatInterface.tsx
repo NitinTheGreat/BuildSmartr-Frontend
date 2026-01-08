@@ -570,6 +570,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 >
                   <Pencil className="w-4 h-4 text-muted-foreground" />
                 </button>
+                {/* SHARE FEATURE DISABLED
                 <button 
                   onClick={() => setIsShareModalOpen(true)}
                   className="p-2 hover:bg-[#3c3f45] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
@@ -577,6 +578,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 >
                   <Share2 className="w-4 h-4 text-muted-foreground" />
                 </button>
+                */}
               </div>
             )}
           </div>
@@ -630,6 +632,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               Project Files ({project.files.length})
             </span>
             <div className="flex items-center gap-2">
+              {/* SHARE FEATURE DISABLED
               <Button
                 variant="outline"
                 size="sm"
@@ -639,6 +642,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 <Share2 className="w-4 h-4" />
                 Share
               </Button>
+              */}
               <Button
                 variant="outline"
                 size="sm"
@@ -717,7 +721,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                     <div>
                       <p className="text-sm font-medium text-foreground">{chat.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {chat.messages.length} message{chat.messages.length !== 1 ? 's' : ''}
+                        {chat.messageCount} message{chat.messageCount !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
