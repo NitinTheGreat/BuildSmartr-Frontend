@@ -65,6 +65,7 @@ export default async function RootLayout({
       <body className={`font-sans antialiased`}>
         <ProjectProvider>
           {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
+          {user && <TopBar userName={firstName || fullName} />}
           <div className={user ? "ml-0 md:ml-20 transition-all duration-300" : ""}>{children}</div>
         </ProjectProvider>
         {/* <Analytics /> */}

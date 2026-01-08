@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Share2, Mail, MessageCircle, Copy, Check } from "lucide-react"
+import { X, Share2, Mail, Copy, Check, Send, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface ShareIIVYModalProps {
@@ -13,6 +13,9 @@ interface ShareIIVYModalProps {
 
 export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProps) {
   const [copied, setCopied] = useState(false)
+  const [emailInput, setEmailInput] = useState("")
+  const [isSending, setIsSending] = useState(false)
+  const [sendStatus, setSendStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   
   // The share URL - you can update this to your production URL
   const shareUrl = typeof window !== 'undefined' 
@@ -35,10 +38,46 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
     }
   }
 
-  const handleEmailShare = () => {
-    const subject = encodeURIComponent(`${userName || 'Your friend'} invited you to try IIVY`)
-    const body = encodeURIComponent(fullMessage)
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank')
+  const handleSendEmail = async () => {
+    if (!emailInput.trim() || isSending) return
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(emailInput.trim())) {
+      setSendStatus({ type: 'error', message: 'Please enter a valid email address' })
+      return
+    }
+
+    setIsSending(true)
+    setSendStatus(null)
+
+    try {
+      const response = await fetch('/api/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailInput.trim(),
+          userName: userName || 'Someone',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send invite')
+      }
+
+      setSendStatus({ type: 'success', message: 'Invite sent successfully!' })
+      setEmailInput("")
+      setTimeout(() => setSendStatus(null), 3000)
+    } catch (err) {
+      setSendStatus({ 
+        type: 'error', 
+        message: err instanceof Error ? err.message : 'Failed to send invite' 
+      })
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleWhatsAppShare = () => {
@@ -86,44 +125,63 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
 
           {/* Content */}
           <div className="p-4 space-y-4">
-            {/* Preview message */}
-            <div className="bg-[#2b2d31] rounded-lg p-4 border border-border">
-              <p className="text-sm text-muted-foreground mb-2">Your invite message:</p>
-              <p className="text-sm text-foreground">{shareMessage}</p>
-            </div>
-
-            {/* Share options */}
+            {/* Email invite */}
             <div className="space-y-3">
-              <p className="text-sm font-medium text-foreground">Share via</p>
-              
-              {/* Email */}
-              <button
-                onClick={handleEmailShare}
-                className="w-full flex items-center gap-4 p-4 bg-[#2b2d31] hover:bg-[#3c3f45] rounded-lg border border-border transition-colors"
-              >
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Mail className="w-5 h-5 text-blue-400" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">Email</p>
-                  <p className="text-sm text-muted-foreground">Send invite via email</p>
-                </div>
-              </button>
-
-              {/* WhatsApp */}
-              <button
-                onClick={handleWhatsAppShare}
-                className="w-full flex items-center gap-4 p-4 bg-[#2b2d31] hover:bg-[#3c3f45] rounded-lg border border-border transition-colors"
-              >
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <MessageCircle className="w-5 h-5 text-green-400" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">WhatsApp</p>
-                  <p className="text-sm text-muted-foreground">Share via WhatsApp</p>
-                </div>
-              </button>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-blue-400" />
+                <p className="text-sm font-medium text-foreground">Invite via Email</p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendEmail()}
+                  placeholder="Enter email address"
+                  className="flex-1 bg-[#2b2d31] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                <Button
+                  onClick={handleSendEmail}
+                  disabled={!emailInput.trim() || isSending}
+                  className="bg-accent hover:bg-accent-strong text-background gap-2"
+                >
+                  {isSending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Send
+                </Button>
+              </div>
+              {sendStatus && (
+                <p className={`text-sm ${sendStatus.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                  {sendStatus.message}
+                </p>
+              )}
             </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">or share via</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* WhatsApp */}
+            <button
+              onClick={handleWhatsAppShare}
+              className="w-full flex items-center gap-4 p-4 bg-[#2b2d31] hover:bg-[#3c3f45] rounded-lg border border-border transition-colors"
+            >
+              <div className="p-2 bg-[#25D366]/20 rounded-lg">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#25D366">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-foreground">WhatsApp</p>
+                <p className="text-sm text-muted-foreground">Share via WhatsApp</p>
+              </div>
+            </button>
 
             {/* Copy link */}
             <div className="pt-2 border-t border-border">
@@ -151,13 +209,6 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
                 </Button>
               </div>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="p-4 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center">
-              Help us grow by sharing IIVY with your network! 🚀
-            </p>
           </div>
         </motion.div>
       </motion.div>
