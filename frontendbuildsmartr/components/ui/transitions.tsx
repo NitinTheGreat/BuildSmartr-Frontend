@@ -1,14 +1,16 @@
 "use client"
 
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, type Variants } from "framer-motion"
 import { usePathname } from "next/navigation"
-import { type ReactNode } from "react"
+import type { ReactNode, CSSProperties } from "react"
+
+/* ---------------- Page Transition ---------------- */
 
 interface PageTransitionProps {
   children: ReactNode
 }
 
-const pageVariants = {
+const pageVariants: Variants = {
   initial: {
     opacity: 0,
     y: 8,
@@ -18,30 +20,30 @@ const pageVariants = {
     y: 0,
     transition: {
       duration: 0.3,
-      ease: [0.4, 0, 0.2, 1],
-    },
+      ease: "easeInOut",
+    } as const, // Added 'as const' to prevent type widening (fixes potential number[] errors)
   },
   exit: {
     opacity: 0,
     y: -8,
     transition: {
       duration: 0.2,
-      ease: [0.4, 0, 1, 1],
-    },
+      ease: "easeInOut",
+    } as const,
   },
 }
 
 export function PageTransition({ children }: PageTransitionProps) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ""
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={pathname}
+        variants={pageVariants}
         initial="initial"
         animate="enter"
         exit="exit"
-        variants={pageVariants}
         className="w-full"
       >
         {children}
@@ -50,14 +52,17 @@ export function PageTransition({ children }: PageTransitionProps) {
   )
 }
 
-// Fade transition for modals and overlays
 interface FadeTransitionProps {
   children: ReactNode
   isVisible: boolean
   className?: string
 }
 
-export function FadeTransition({ children, isVisible, className }: FadeTransitionProps) {
+export function FadeTransition({
+  children,
+  isVisible,
+  className,
+}: FadeTransitionProps) {
   return (
     <AnimatePresence>
       {isVisible && (
@@ -65,7 +70,7 @@ export function FadeTransition({ children, isVisible, className }: FadeTransitio
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
           className={className}
         >
           {children}
@@ -75,14 +80,19 @@ export function FadeTransition({ children, isVisible, className }: FadeTransitio
   )
 }
 
-// Slide up transition for bottom sheets and modals
+/* ---------------- Slide Up Transition ---------------- */
+
 interface SlideUpTransitionProps {
   children: ReactNode
   isVisible: boolean
   className?: string
 }
 
-export function SlideUpTransition({ children, isVisible, className }: SlideUpTransitionProps) {
+export function SlideUpTransition({
+  children,
+  isVisible,
+  className,
+}: SlideUpTransitionProps) {
   return (
     <AnimatePresence>
       {isVisible && (
@@ -100,19 +110,20 @@ export function SlideUpTransition({ children, isVisible, className }: SlideUpTra
   )
 }
 
-// Scale transition for popups and dropdowns
+/* ---------------- Scale Transition ---------------- */
+
 interface ScaleTransitionProps {
   children: ReactNode
   isVisible: boolean
   className?: string
-  origin?: string
+  origin?: CSSProperties["transformOrigin"]
 }
 
-export function ScaleTransition({ 
-  children, 
-  isVisible, 
+export function ScaleTransition({
+  children,
+  isVisible,
   className,
-  origin = "center" 
+  origin = "center",
 }: ScaleTransitionProps) {
   return (
     <AnimatePresence>
@@ -121,7 +132,7 @@ export function ScaleTransition({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
           style={{ transformOrigin: origin }}
           className={className}
         >
@@ -132,18 +143,22 @@ export function ScaleTransition({
   )
 }
 
-// Staggered list animation
+/* ---------------- Staggered List ---------------- */
+
 interface StaggeredListProps {
-  children: ReactNode[]
+  children: ReactNode
   className?: string
   staggerDelay?: number
 }
 
-export function StaggeredList({ 
-  children, 
+export function StaggeredList({
+  children,
   className,
-  staggerDelay = 0.05 
+  staggerDelay = 0.05,
 }: StaggeredListProps) {
+  // Ensure children is an array to map safely
+  const items = Array.isArray(children) ? children : [children]
+
   return (
     <motion.div
       initial="hidden"
@@ -157,14 +172,14 @@ export function StaggeredList({
         },
       }}
     >
-      {children.map((child, index) => (
+      {items.map((child, index) => (
         <motion.div
           key={index}
           variants={{
             hidden: { opacity: 0, y: 10 },
             visible: { opacity: 1, y: 0 },
           }}
-          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
         >
           {child}
         </motion.div>
