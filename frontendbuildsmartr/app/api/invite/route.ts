@@ -27,10 +27,10 @@ export async function POST(request: NextRequest) {
     }
 
     const inviterName = userName || 'Someone'
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://iivy.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://iivy.ai'
 
     const { data, error } = await resend.emails.send({
-      from: 'IIVY <noreply@iivy.app>', // Update this to your verified domain
+      from: 'IIVY <noreply@iivy.ai>', // Update this to your verified domain
       to: email,
       subject: `${inviterName} invited you to try IIVY`,
       html: `
