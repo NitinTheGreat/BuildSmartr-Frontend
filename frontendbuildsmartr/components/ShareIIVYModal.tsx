@@ -4,6 +4,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Share2, Mail, Copy, Check, Send, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 
 interface ShareIIVYModalProps {
   isOpen: boolean
@@ -93,7 +94,13 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 safe-area-all"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          paddingLeft: 'env(safe-area-inset-left, 0px)',
+          paddingRight: 'env(safe-area-inset-right, 0px)',
+        }}
         onClick={onClose}
       >
         <motion.div
@@ -101,7 +108,13 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="bg-[#1f2121] border border-border rounded-xl w-full max-w-md shadow-xl"
+          className="bg-[#1f2121] border border-border rounded-xl w-full max-w-md shadow-xl safe-area-all"
+          style={{
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            paddingLeft: 'env(safe-area-inset-left, 0px)',
+            paddingRight: 'env(safe-area-inset-right, 0px)',
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -143,10 +156,10 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
                 <Button
                   onClick={handleSendEmail}
                   disabled={!emailInput.trim() || isSending}
-                  className="bg-accent hover:bg-accent-strong text-background gap-2"
+                  className="bg-accent hover:bg-accent-strong text-background gap-2 transition-smooth"
                 >
                   {isSending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                   ) : (
                     <Send className="w-4 h-4" />
                   )}

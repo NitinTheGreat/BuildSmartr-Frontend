@@ -24,9 +24,10 @@ export const viewport: Viewport = {
   themeColor: "#1f2121",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: "cover",
+  interactiveWidget: "resizes-visual",
 }
 
 export const metadata: Metadata = {
@@ -38,6 +39,20 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "IIVY",
+    startupImage: [
+      {
+        url: "/apple-splash-2048-2732.jpg",
+        media: "(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)",
+      },
+      {
+        url: "/apple-splash-1170-2532.jpg",
+        media: "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/apple-splash-1284-2778.jpg",
+        media: "(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+    ],
   },
   formatDetection: {
     telephone: false,
@@ -77,11 +92,20 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className={`font-sans antialiased`}>
+      <head>
+        {/* Additional meta tags for iOS */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#1f2121" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#1f2121" media="(prefers-color-scheme: light)" />
+      </head>
+      <body className="font-sans antialiased safe-area-all scroll-smooth-ios">
         <ProjectProvider>
           {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
           {user && <TopBar userName={firstName || fullName} />}
-          <div className={user ? "ml-0 md:ml-20 transition-all duration-300" : ""}>{children}</div>
+          <main className={user ? "ml-0 md:ml-20 transition-all duration-300 ease-out min-h-screen-safe" : "min-h-screen"}>
+            {children}
+          </main>
         </ProjectProvider>
         {/* <Analytics /> */}
       </body>

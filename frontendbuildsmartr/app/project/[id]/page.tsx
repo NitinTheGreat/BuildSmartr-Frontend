@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
 import { ProjectChatInterface } from "@/components/ProjectChatInterface"
+import { Spinner } from "@/components/ui/spinner"
+import { motion } from "framer-motion"
 
 export default function ProjectPage() {
   const params = useParams()
@@ -45,14 +47,34 @@ export default function ProjectPage() {
   // Show loading state
   if (isLoading || !currentProject || currentProject.id !== projectId) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading project...</p>
+      <motion.div 
+        className="min-h-screen flex items-center justify-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <Spinner size="lg" variant="dots" />
+          <motion.p 
+            className="text-muted-foreground text-sm"
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            Loading project...
+          </motion.p>
         </div>
-      </div>
+      </motion.div>
     )
   }
 
-  return <ProjectChatInterface project={currentProject} />
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <ProjectChatInterface project={currentProject} />
+    </motion.div>
+  )
 }

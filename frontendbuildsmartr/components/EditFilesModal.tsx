@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, File, Trash2, HardHat, Ruler, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { useProjects } from "@/contexts/ProjectContext"
 import type { ProjectFile, FileCategory } from "@/types/project"
 
@@ -259,7 +260,13 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-[#2b2d31] border border-border rounded-xl shadow-2xl z-50 overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-[#2b2d31] border border-border rounded-xl shadow-2xl z-50 overflow-hidden safe-area-all"
+            style={{
+              paddingTop: 'env(safe-area-inset-top, 0px)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              paddingLeft: 'env(safe-area-inset-left, 0px)',
+              paddingRight: 'env(safe-area-inset-right, 0px)',
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
@@ -301,11 +308,11 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
                 <Button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="bg-accent hover:bg-accent-strong text-background gap-2"
+                  className="bg-accent hover:bg-accent-strong text-background gap-2 transition-smooth"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Spinner size="sm" className="mr-2" />
                       Uploading...
                     </>
                   ) : (

@@ -4,6 +4,7 @@ import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Upload, File, Trash2, HardHat, Ruler, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { useProjects } from "@/contexts/ProjectContext"
 import type { FileCategory } from "@/types/project"
 import { useRouter } from "next/navigation"
@@ -230,16 +231,27 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 z-50"
+            style={{
+              paddingTop: 'env(safe-area-inset-top, 0px)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              paddingLeft: 'env(safe-area-inset-left, 0px)',
+              paddingRight: 'env(safe-area-inset-right, 0px)',
+            }}
             onClick={onClose}
           />
-          
           {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] bg-[#2b2d31] border border-border rounded-xl shadow-2xl z-50 flex flex-col"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg max-h-[90vh] bg-[#2b2d31] border border-border rounded-xl shadow-2xl z-50 flex flex-col safe-area-all"
+            style={{
+              paddingTop: 'env(safe-area-inset-top, 0px)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              paddingLeft: 'env(safe-area-inset-left, 0px)',
+              paddingRight: 'env(safe-area-inset-right, 0px)',
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
@@ -251,7 +263,6 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
-
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
               {/* Project Name */}
@@ -265,11 +276,10 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter project name..."
-                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-smooth"
                   required
                 />
               </div>
-
               {/* Description */}
               <div>
                 <label htmlFor="projectDescription" className="block text-sm font-medium text-foreground mb-2">
@@ -282,10 +292,9 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe what this project is about..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none transition-smooth"
                 />
               </div>
-
               {/* Company Address */}
               <div>
                 <label htmlFor="companyAddress" className="block text-sm font-medium text-foreground mb-2">
@@ -298,10 +307,9 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                   value={companyAddress}
                   onChange={(e) => setCompanyAddress(e.target.value)}
                   placeholder="Enter company address..."
-                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-smooth"
                 />
               </div>
-
               {/* Tags */}
               <div>
                 <label htmlFor="tags" className="block text-sm font-medium text-foreground mb-2">
@@ -315,14 +323,14 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={handleTagKeyDown}
                   placeholder="Type a tag and press Enter..."
-                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-smooth"
                 />
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {tags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-accent/20 text-accent text-sm rounded-md"
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-accent/20 text-accent text-sm rounded-md animate-fade-in"
                       >
                         {tag}
                         <button
@@ -337,21 +345,18 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                   </div>
                 )}
               </div>
-
               {/* File Upload - 3 Categories */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-3">
                   Upload Files
                   <span className="text-muted-foreground font-normal ml-1">(optional)</span>
                 </label>
-                
                 <div className="grid grid-cols-3 gap-3">
                   <FileUploadBox category="construction" />
                   <FileUploadBox category="architectural" />
                   <FileUploadBox category="other" />
                 </div>
               </div>
-
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-2">
                 <Button
@@ -366,11 +371,11 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                 <Button
                   type="submit"
                   disabled={!name.trim() || isSubmitting}
-                  className="bg-accent hover:bg-accent-strong text-background"
+                  className="bg-accent hover:bg-accent-strong text-background transition-smooth"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Spinner size="sm" className="mr-2" />
                       Creating...
                     </>
                   ) : (

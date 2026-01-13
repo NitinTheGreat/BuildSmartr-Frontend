@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { Sparkles, Mic, Globe, Mail, Quote, FileText, ChevronDown, X, MessageSquare } from "lucide-react"
 import { useProjects } from "@/contexts/ProjectContext"
 import type { SearchMode } from "@/types/project"
@@ -151,33 +152,65 @@ export function GeneralChatInterface() {
   // If no current chat, show the welcome screen with SearchInterface
   if (!currentChat) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center p-8">
+      <motion.main 
+        className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)',
+        }}
+      >
         {/* Logo */}
-        <div className="mb-12">
-          <h1 className="text-5xl font-bold tracking-tight">
+        <motion.div 
+          className="mb-8 md:mb-12"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.5 }}
+        >
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
             <span className="text-foreground">IIvy</span>
           </h1>
-        </div>
+        </motion.div>
 
         {/* Search Interface */}
-        <SearchInterface />
-      </main>
+        <motion.div
+          className="w-full"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <SearchInterface />
+        </motion.div>
+      </motion.main>
     )
   }
 
   // Chat view with messages
   return (
-    <div className="min-h-screen flex flex-col">
+    <motion.div 
+      className="min-h-screen flex flex-col"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
+      <div 
+        className="sticky z-10 bg-background/80 backdrop-blur-md border-b border-border/50"
+        style={{ 
+          top: 0,
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        }}
+      >
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-accent" />
-          <h1 className="font-semibold text-foreground">{currentChat.title}</h1>
+          <h1 className="font-semibold text-foreground truncate">{currentChat.title}</h1>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scroll-smooth-ios">
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
           {messages.map((message) => (
             <motion.div
@@ -225,8 +258,14 @@ export function GeneralChatInterface() {
       </div>
 
       {/* Input at bottom */}
-      <div className="sticky bottom-0 bg-background border-t border-border z-20 overflow-visible">
-        <div className="max-w-3xl mx-auto px-4 py-4">
+      <div 
+        className="sticky bg-background/95 backdrop-blur-md border-t border-border/50 z-20 overflow-visible"
+        style={{
+          bottom: 0,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+      >
+        <div className="max-w-3xl mx-auto px-4 py-3 md:py-4">
           <form onSubmit={handleSubmit} className="relative">
             <div className="relative bg-surface rounded-xl border border-border shadow-sm hover:border-muted transition-colors overflow-visible">
               {/* Selected modes chips */}
@@ -364,11 +403,15 @@ export function GeneralChatInterface() {
                     <Button
                       type="submit"
                       size="icon"
-                      disabled={!query.trim()}
-                      className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-8 w-8"
+                      disabled={!query.trim() || isSubmitting}
+                      className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
                       aria-label="Submit"
                     >
-                      <Sparkles className="size-4" />
+                      {isSubmitting ? (
+                        <Spinner size="sm" className="border-background border-t-transparent" />
+                      ) : (
+                        <Sparkles className="size-4" />
+                      )}
                     </Button>
                   </motion.div>
                 </div>
@@ -377,6 +420,6 @@ export function GeneralChatInterface() {
           </form>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

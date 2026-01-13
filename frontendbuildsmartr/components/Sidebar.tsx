@@ -401,7 +401,11 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
       {/* Mobile Hamburger Button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="fixed top-4 left-4 z-50 md:hidden w-10 h-10 rounded-lg bg-[#2b2d31] flex items-center justify-center"
+        className="fixed z-50 md:hidden w-11 h-11 rounded-xl bg-[#2b2d31]/95 backdrop-blur-sm flex items-center justify-center shadow-lg border border-border/50 transition-all duration-200 hover:bg-[#3c3f45] active:scale-95"
+        style={{ 
+          top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+          left: 'calc(env(safe-area-inset-left, 0px) + 12px)'
+        }}
         aria-label="Open menu"
       >
         <Menu className="w-5 h-5 text-foreground" />
@@ -429,27 +433,39 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-0 top-0 h-screen w-64 bg-[#2b2d31] flex flex-col py-4 z-50 md:hidden overflow-x-hidden"
+            className="fixed left-0 top-0 h-screen w-[280px] max-w-[85vw] bg-[#2b2d31] flex flex-col z-50 md:hidden overflow-x-hidden shadow-2xl"
+            style={{
+              paddingTop: 'env(safe-area-inset-top, 0px)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              paddingLeft: 'env(safe-area-inset-left, 0px)',
+            }}
           >
             {/* Close Button */}
             <button
               onClick={closeMobileMenu}
-              className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-transparent flex items-center justify-center hover:bg-[#3c3f45] transition-colors"
+              className="absolute top-3 right-3 w-9 h-9 rounded-lg bg-transparent flex items-center justify-center hover:bg-[#3c3f45] transition-colors z-10"
+              style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
               aria-label="Close menu"
             >
-              <X className="w-4 h-4 text-muted-foreground" />
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
-            {sidebarContent(true)}
+            <div className="flex-1 flex flex-col py-4 overflow-hidden">
+              {sidebarContent(true)}
+            </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
       <aside 
-        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col py-4 z-50 transition-all duration-300 ease-in-out overflow-y-auto ${
+        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col z-50 transition-all duration-300 ease-out overflow-y-auto ${
           isExpanded ? 'w-64' : 'w-20'
         }`}
-        style={{ overflow: isExpanded ? 'hidden auto' : 'visible' }}
+        style={{ 
+          overflow: isExpanded ? 'hidden auto' : 'visible',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+        }}
       >
         {sidebarContent(isExpanded)}
       </aside>
