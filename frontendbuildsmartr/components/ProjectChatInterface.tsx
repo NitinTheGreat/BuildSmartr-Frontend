@@ -413,7 +413,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                     />
 
                     <div className="flex items-center gap-2">
-                      {/* Search mode dropdown */}
+                      {/*
+                      // Search mode dropdown, mic, and sparkles icons commented out
                       <div className="relative" ref={dropdownRef}>
                         <motion.button
                           type="button"
@@ -501,6 +502,24 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                           aria-label="Submit"
                         >
                           <Sparkles className="size-4" />
+                        </Button>
+                      </motion.div>
+                      */}
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <Button
+                          type="submit"
+                          size="icon"
+                          disabled={!query.trim()}
+                          className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-8 w-8"
+                          aria-label="Send"
+                        >
+                          {/* Use send icon with bluish accent */}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                          </svg>
                         </Button>
                       </motion.div>
                     </div>
@@ -758,16 +777,10 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 />
 
                 <div className="flex items-center gap-2 pt-2">
-                  <motion.button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    aria-label="Voice input"
-                  >
-                    <Mic className="size-5" />
-                  </motion.button>
-
+                  {/*
+                  // Mic and other icons commented out for now
+                  <motion.button ... > <Mic className="size-5" /> </motion.button>
+                  */}
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -776,10 +789,13 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                       type="submit"
                       size="icon"
                       disabled={!query.trim()}
-                      className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50"
-                      aria-label="Submit"
+                      className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50"
+                      aria-label="Send"
                     >
-                      <Sparkles className="size-5" />
+                      {/* Use send icon with bluish accent */}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                      </svg>
                     </Button>
                   </motion.div>
                 </div>

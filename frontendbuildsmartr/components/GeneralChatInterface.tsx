@@ -320,82 +320,11 @@ export function GeneralChatInterface() {
                 />
 
                 <div className="flex items-center gap-2">
-                  {/* Search mode dropdown */}
-                  <div className="relative" ref={dropdownRef}>
-                    <motion.button
-                      type="button"
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className={`flex items-center gap-1 p-1.5 rounded-lg transition-colors ${
-                        selectedModes.length > 0 
-                          ? 'text-accent bg-accent/10' 
-                          : 'text-muted-foreground hover:text-foreground hover:bg-[#3c3f45]'
-                      }`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Globe className="w-4 h-4" />
-                      <ChevronDown className={`w-2.5 h-2.5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                    </motion.button>
-
-                  <AnimatePresence>
-                    {isDropdownOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute right-0 bottom-full mb-2 bg-[#2b2d31] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
-                      >
-                        {searchModeOptions.map((option) => {
-                          const Icon = option.icon
-                          const isSelected = selectedModes.includes(option.id)
-                          const isDisabled = option.exclusive 
-                            ? selectedModes.length > 0 && !selectedModes.includes('pdf')
-                            : selectedModes.includes('pdf')
-                          
-                          return (
-                            <button
-                              key={option.id}
-                              type="button"
-                              onClick={() => handleModeToggle(option.id)}
-                              disabled={isDisabled && !isSelected}
-                              className={`
-                                w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors
-                                ${isSelected 
-                                  ? 'bg-accent/20 text-accent' 
-                                  : isDisabled 
-                                    ? 'text-muted-foreground/50 cursor-not-allowed'
-                                    : 'text-foreground hover:bg-[#3c3f45]'
-                                }
-                              `}
-                            >
-                              <Icon className={`w-4 h-4 ${isSelected ? 'text-accent' : ''}`} />
-                              <span className="flex-1 text-left">{option.label}</span>
-                              {isSelected && (
-                                <motion.div
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  className="w-2 h-2 rounded-full bg-accent"
-                                />
-                              )}
-                            </button>
-                          )
-                        })}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  </div>
-
-                  <motion.button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    aria-label="Voice input"
-                  >
-                    <Mic className="size-4" />
-                  </motion.button>
-
+                  {/*
+                  // Search mode dropdown and icons commented out for now
+                  <div className="relative" ref={dropdownRef}> ... </div>
+                  <motion.button ... > <Mic className="size-4" /> </motion.button>
+                  */}
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -404,14 +333,13 @@ export function GeneralChatInterface() {
                       type="submit"
                       size="icon"
                       disabled={!query.trim() || isSubmitting}
-                      className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
-                      aria-label="Submit"
+                      className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
+                      aria-label="Send"
                     >
-                      {isSubmitting ? (
-                        <Spinner size="sm" className="border-background border-t-transparent" />
-                      ) : (
-                        <Sparkles className="size-4" />
-                      )}
+                      {/* Use send icon with bluish accent */}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                      </svg>
                     </Button>
                   </motion.div>
                 </div>

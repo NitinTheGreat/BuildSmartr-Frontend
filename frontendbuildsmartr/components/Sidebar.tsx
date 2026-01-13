@@ -162,9 +162,9 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
           </div>
         )}
       </div>
-
+        {/* to be uncommented later */}
       {/* New Chat Button */}
-      <div className={`w-full ${isExpandedView ? 'px-3' : 'px-2'} mb-4`}>
+      {/* <div className={`w-full ${isExpandedView ? 'px-3' : 'px-2'} mb-4`}>
         <Tooltip label="New Chat">
           <Link href="/chat" onClick={closeMobileMenu}>
             <motion.div
@@ -180,7 +180,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             </motion.div>
           </Link>
         </Tooltip>
-      </div>
+      </div> */}
 
       {/* Search Box - Expanded View Only */}
       {isExpandedView && (
@@ -304,9 +304,9 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 })}
             </div>
           )}
-
+{/* to be uncommented */}
           {/* General Chats Section */}
-          {generalChats.filter(c => searchQuery === '' || c.title.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
+          {/* {generalChats.filter(c => searchQuery === '' || c.title.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
             <div className="space-y-1">
               {isExpandedView && (
                 <span className="text-[10px] uppercase text-muted-foreground px-1 mb-2 block">Chats</span>
@@ -335,7 +335,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                   </Tooltip>
                 ))}
             </div>
-          )}
+          )} */}
         </div>
       </div>
 
