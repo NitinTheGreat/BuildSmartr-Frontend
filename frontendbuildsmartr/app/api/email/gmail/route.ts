@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 // Gmail OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL 
-  ? `${process.env.NEXT_PUBLIC_APP_URL}/api/email/gmail/callback`
+const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
+  ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/email/gmail/callback`
   : "http://localhost:3000/api/email/gmail/callback";
 
 // Gmail scopes needed for email access
@@ -25,6 +25,9 @@ export async function GET() {
   }
 
   // Build Google OAuth URL
+  console.log("[Gmail OAuth] NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
+  console.log("[Gmail OAuth] Redirect URI being used in route.ts:", GOOGLE_REDIRECT_URI);
+
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", GOOGLE_REDIRECT_URI);

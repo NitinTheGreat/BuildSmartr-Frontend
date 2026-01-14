@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
-  ? `${process.env.NEXT_PUBLIC_APP_URL}/api/email/gmail/callback`
+  ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/email/gmail/callback`
   : "http://localhost:3000/api/email/gmail/callback";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071";
 
@@ -25,12 +25,17 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
 
+  console.log("[Gmail OAuth] Session exists:", !!session);
+  console.log("[Gmail OAuth] Redirect URI being used:", GOOGLE_REDIRECT_URI);
+
   if (!session?.access_token) {
+    console.error("[Gmail OAuth] No session or access token found");
     return NextResponse.redirect(new URL("/account?error=unauthorized", request.url));
   }
 
   try {
     // Exchange code for tokens
+    console.log("[Gmail OAuth] Exchanging code for tokens...");
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: {
@@ -46,13 +51,34 @@ export async function GET(request: Request) {
     });
 
     const tokens = await tokenResponse.json();
+    console.log("[Gmail OAuth] Token exchange response:", tokens.error || "success");
 
     if (tokens.error) {
-      console.error("[Gmail OAuth] Token error:", tokens.error);
+      console.error("[Gmail OAuth] Token error:", tokens.error, tokens.error_description);
       return NextResponse.redirect(new URL("/account?error=token_exchange_failed", request.url));
     }
 
+    // Get user's Gmail email from Google's userinfo endpoint
+    console.log("[Gmail OAuth] Fetching user email from Google...");
+    const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: {
+        Authorization: `Bearer ${tokens.access_token}`,
+      },
+    });
+
+    const userInfo = await userInfoResponse.json();
+    console.log("[Gmail OAuth] User email:", userInfo.email);
+
+    if (!userInfo.email) {
+      console.error("[Gmail OAuth] Failed to get user email from Google");
+      return NextResponse.redirect(new URL("/account?error=no_email", request.url));
+    }
+
     // Call backend to store the Gmail connection
+    // Backend expects: gmail_email and gmail_token (plus optional refresh_token, expires_in, etc.)
+    console.log("[Gmail OAuth] Calling backend to store Gmail connection...");
+    console.log("[Gmail OAuth] Backend URL:", `${BACKEND_URL}/api/user/connect/gmail`);
+
     const backendResponse = await fetch(`${BACKEND_URL}/api/user/connect/gmail`, {
       method: "POST",
       headers: {
@@ -60,20 +86,20 @@ export async function GET(request: Request) {
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_in: tokens.expires_in,
-        token_type: tokens.token_type,
-        scope: tokens.scope,
+        gmail_email: userInfo.email,
+        gmail_token: tokens,  // Send the entire tokens object
       }),
     });
 
     if (!backendResponse.ok) {
-      const errorData = await backendResponse.json().catch(() => ({}));
-      console.error("[Gmail OAuth] Backend error:", errorData);
+      const errorText = await backendResponse.text().catch(() => "");
+      console.error("[Gmail OAuth] Backend error - URL:", `${BACKEND_URL}/api/user/connect/gmail`);
+      console.error("[Gmail OAuth] Backend error - Status:", backendResponse.status);
+      console.error("[Gmail OAuth] Backend error - Response:", errorText);
       return NextResponse.redirect(new URL("/account?error=backend_error", request.url));
     }
 
+    console.log("[Gmail OAuth] Successfully connected Gmail!");
     return NextResponse.redirect(new URL("/account?success=gmail_connected", request.url));
   } catch (err) {
     console.error("[Gmail OAuth] Unexpected error:", err);

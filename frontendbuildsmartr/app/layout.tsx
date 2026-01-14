@@ -7,7 +7,7 @@ import { TopBar } from "@/components/TopBar"
 import { createClient } from "@/utils/supabase/server"
 import { ProjectProvider } from "@/contexts/ProjectContext"
 import "./globals.css"
-
+import { Analytics } from "@vercel/analytics/next"
 const inter = Inter({ 
   subsets: ["latin"],
   variable: "--font-sans",
@@ -107,7 +107,7 @@ export default async function RootLayout({
             {children}
           </main>
         </ProjectProvider>
-        {/* <Analytics /> */}
+        <Analytics />
       </body>
     </html>
   )
