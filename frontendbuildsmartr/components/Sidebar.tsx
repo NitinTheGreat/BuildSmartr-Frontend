@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search } from "lucide-react"
+import { User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
 import Image from "next/image"
 import logo from "@/public/logo.png"
 import { useProjects } from "@/contexts/ProjectContext"
+import { useIndexing } from "@/contexts/IndexingContext"
 import { NewProjectModal } from "./NewProjectModal"
 
 type SidebarProps = {
@@ -27,6 +28,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const router = useRouter()
   const pathname = usePathname()
   const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat } = useProjects()
+  const { indexingStates } = useIndexing()
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -125,7 +127,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 )}
               </motion.div>
             </Link>
-            
+
             {/* Collapse button - only on desktop */}
             {!isMobileOpen && (
               <button
@@ -147,7 +149,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 </div>
               </motion.div>
             </Link>
-            
+
             {/* Expand button - appears on hover */}
             <button
               onClick={(e) => {
@@ -162,7 +164,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
           </div>
         )}
       </div>
-        {/* to be uncommented later */}
+      {/* to be uncommented later */}
       {/* New Chat Button */}
       {/* <div className={`w-full ${isExpandedView ? 'px-3' : 'px-2'} mb-4`}>
         <Tooltip label="New Chat">
@@ -229,7 +231,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 .map((project) => {
                   const isProjectExpanded = expandedProjectId === project.id
                   const isCurrentProject = pathname === `/project/${project.id}`
-                  
+
                   return (
                     <div key={project.id}>
                       <Tooltip label={project.name}>
@@ -237,44 +239,70 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                           whileTap={{ scale: 0.98 }}
                           onClick={(e) => handleProjectClick(project.id, e)}
                           className={`
-                            flex items-center ${isExpandedView ? 'gap-2 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
-                            ${isCurrentProject 
-                              ? 'bg-accent/20 text-foreground' 
+                            flex flex-col ${isExpandedView ? 'gap-1 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
+                            ${isCurrentProject
+                              ? 'bg-accent/20 text-foreground'
                               : 'hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground'
                             }
                           `}
                         >
-                          {isExpandedView && (
-                            <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                              {project.chats.length > 0 ? (
-                                isProjectExpanded ? (
-                                  <ChevronDown className="w-3 h-3" />
-                                ) : (
-                                  <ChevronRight className="w-3 h-3" />
-                                )
-                              ) : null}
-                            </span>
-                          )}
-                          <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                          {isExpandedView && (
-                            <>
-                              <span 
-                                className="text-sm truncate flex-1"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleProjectNavigate(project.id)
-                                }}
-                              >
-                                {project.name}
+                          <div className={`flex items-center ${isExpandedView ? 'gap-2' : 'justify-center'}`}>
+                            {isExpandedView && (
+                              <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                                {project.chats.length > 0 ? (
+                                  isProjectExpanded ? (
+                                    <ChevronDown className="w-3 h-3" />
+                                  ) : (
+                                    <ChevronRight className="w-3 h-3" />
+                                  )
+                                ) : null}
                               </span>
-                              {project.chats.length > 0 && (
-                                <span className="text-[10px] text-muted-foreground">{project.chats.length}</span>
-                              )}
-                            </>
+                            )}
+                            {/* Show indexing spinner or folder icon */}
+                            {indexingStates[project.id]?.status === 'indexing' ? (
+                              <Loader2 className="w-4 h-4 flex-shrink-0 text-accent animate-spin" />
+                            ) : indexingStates[project.id]?.status === 'completed' &&
+                              indexingStates[project.id]?.completedAt &&
+                              Date.now() - indexingStates[project.id].completedAt! < 30000 ? (
+                              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-green-400" />
+                            ) : (
+                              <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                            )}
+                            {isExpandedView && (
+                              <>
+                                <span
+                                  className="text-sm truncate flex-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleProjectNavigate(project.id)
+                                  }}
+                                >
+                                  {project.name}
+                                </span>
+                                {project.chats.length > 0 && !indexingStates[project.id] && (
+                                  <span className="text-[10px] text-muted-foreground">{project.chats.length}</span>
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {/* Indexing progress bar */}
+                          {isExpandedView && indexingStates[project.id]?.status === 'indexing' && (
+                            <div className="mt-1">
+                              <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-all duration-300"
+                                  style={{ width: `${indexingStates[project.id]?.percent || 0}%` }}
+                                />
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                                {indexingStates[project.id]?.currentStep || 'Indexing...'}
+                              </p>
+                            </div>
                           )}
                         </motion.div>
                       </Tooltip>
-                      
+
                       {/* Chats list - shown when project is expanded */}
                       {isExpandedView && isProjectExpanded && project.chats.length > 0 && (
                         <AnimatePresence>
@@ -304,7 +332,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 })}
             </div>
           )}
-{/* to be uncommented */}
+          {/* to be uncommented */}
           {/* General Chats Section */}
           {/* {generalChats.filter(c => searchQuery === '' || c.title.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
             <div className="space-y-1">
@@ -393,16 +421,16 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   return (
     <>
       {/* New Project Modal */}
-      <NewProjectModal 
-        isOpen={isNewProjectModalOpen} 
-        onClose={() => setIsNewProjectModalOpen(false)} 
+      <NewProjectModal
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
       />
 
       {/* Mobile Hamburger Button */}
       <button
         onClick={() => setIsMobileOpen(true)}
         className="fixed z-50 md:hidden w-11 h-11 rounded-xl bg-[#2b2d31]/95 backdrop-blur-sm flex items-center justify-center shadow-lg border border-border/50 transition-all duration-200 hover:bg-[#3c3f45] active:scale-95"
-        style={{ 
+        style={{
           top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
           left: 'calc(env(safe-area-inset-left, 0px) + 12px)'
         }}
@@ -457,11 +485,10 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <aside 
-        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col z-50 transition-all duration-300 ease-out overflow-y-auto ${
-          isExpanded ? 'w-64' : 'w-20'
-        }`}
-        style={{ 
+      <aside
+        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col z-50 transition-all duration-300 ease-out overflow-y-auto ${isExpanded ? 'w-64' : 'w-20'
+          }`}
+        style={{
           overflow: isExpanded ? 'hidden auto' : 'visible',
           paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
           paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',

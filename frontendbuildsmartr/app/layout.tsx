@@ -6,15 +6,17 @@ import { Sidebar } from "@/components/Sidebar"
 import { TopBar } from "@/components/TopBar"
 import { createClient } from "@/utils/supabase/server"
 import { ProjectProvider } from "@/contexts/ProjectContext"
+import { IndexingProvider } from "@/contexts/IndexingContext"
+import { FloatingProgressIndicator } from "@/components/FloatingProgressIndicator"
 import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
-const inter = Inter({ 
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
 })
 
-const jetbrainsMono = JetBrains_Mono({ 
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
   display: "swap",
@@ -101,11 +103,14 @@ export default async function RootLayout({
       </head>
       <body className="font-sans antialiased safe-area-all scroll-smooth-ios">
         <ProjectProvider>
-          {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
-          {user && <TopBar userName={firstName || fullName} />}
-          <main className={user ? "ml-0 md:ml-20 transition-all duration-300 ease-out min-h-screen-safe" : "min-h-screen"}>
-            {children}
-          </main>
+          <IndexingProvider>
+            {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
+            {user && <TopBar userName={firstName || fullName} />}
+            <main className={user ? "ml-0 md:ml-20 transition-all duration-300 ease-out min-h-screen-safe" : "min-h-screen"}>
+              {children}
+            </main>
+            {user && <FloatingProgressIndicator />}
+          </IndexingProvider>
         </ProjectProvider>
         <Analytics />
       </body>

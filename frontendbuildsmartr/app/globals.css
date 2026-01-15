@@ -347,6 +347,67 @@
 }
 
 /* ============================================
+   Progress Bar Animations for Indexing
+   ============================================ */
+@keyframes progress-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--accent), 0 0 10px var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 15px var(--accent), 0 0 25px var(--accent);
+  }
+}
+
+@keyframes progress-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-progress-glow {
+  animation: progress-glow 2s ease-in-out infinite;
+}
+
+.animate-progress-shine {
+  animation: progress-shine 1.5s ease-in-out infinite;
+}
+
+/* Confetti-like celebration dots */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.animate-confetti {
+  animation: confetti-fall 3s ease-out forwards;
+}
+
+/* Success checkmark animation */
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-check-draw {
+  stroke-dasharray: 100;
+  animation: check-draw 0.5s ease-out forwards;
+}
+
+
+/* ============================================
    Transition Utilities
    ============================================ */
 .transition-smooth {

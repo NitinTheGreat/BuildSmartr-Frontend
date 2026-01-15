@@ -68,3 +68,54 @@ export interface Project {
   createdAt: Date
   updatedAt: Date
 }
+
+// ============================================
+// Indexing Types
+// ============================================
+
+export interface ProjectIndexingState {
+  projectId: string
+  projectName: string
+  status: 'pending' | 'indexing' | 'completed' | 'error'
+  percent: number
+  currentStep: string
+  startedAt: number
+  completedAt?: number
+  error?: string
+  stats?: {
+    thread_count: number
+    message_count: number
+    pdf_count: number
+    vector_count?: number
+  }
+}
+
+export interface IndexingProgressLog {
+  step: string
+  percent: number
+  timestamp: number
+}
+
+export interface IndexingResponse {
+  status: string
+  project_id: string
+  project_name: string
+  stats: {
+    thread_count: number
+    message_count: number
+    pdf_count: number
+    indexed_at: string
+  }
+  vectorization: {
+    namespace: string
+    vectors_created: number
+    message_chunks: number
+    attachment_chunks: number
+    duration_seconds: number
+  }
+  storage_paths: {
+    threads_data: string
+    attachments_data: string
+  }
+  progress_log: IndexingProgressLog[]
+}
