@@ -74,10 +74,27 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL("/account?error=no_email", request.url));
     }
 
-    // Call backend to store the Gmail connection
-    // Backend expects: gmail_email and gmail_token (plus optional refresh_token, expires_in, etc.)
-    console.log("[Gmail OAuth] Calling backend to store Gmail connection...");
-    console.log("[Gmail OAuth] Backend URL:", `${BACKEND_URL}/api/user/connect/gmail`);
+    // Construct the token object in the format expected by the backend
+    const expiryDate = new Date(Date.now() + (tokens.expires_in * 1000)).toISOString();
+    const gmailToken = {
+      token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_uri: "https://oauth2.googleapis.com/token",
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      scopes: tokens.scope ? tokens.scope.split(" ") : [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+      ],
+      universe_domain: "googleapis.com",
+      account: userInfo.email,
+      expiry: expiryDate,
+    };
+
+    console.log("[Gmail OAuth] Constructed gmail_token object");
 
     const backendResponse = await fetch(`${BACKEND_URL}/api/user/connect/gmail`, {
       method: "POST",
@@ -87,7 +104,7 @@ export async function GET(request: Request) {
       },
       body: JSON.stringify({
         gmail_email: userInfo.email,
-        gmail_token: tokens,  // Send the entire tokens object
+        gmail_token: gmailToken,
       }),
     });
 
