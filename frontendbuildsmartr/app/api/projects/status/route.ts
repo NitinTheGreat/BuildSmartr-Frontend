@@ -24,21 +24,45 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "project_id is required" }, { status: 400 });
     }
 
-    try {
-        console.log("[projects/status] Polling status for:", projectId);
+    const statusUrl = `${AI_BACKEND_URL}/api/get_project_status?project_id=${encodeURIComponent(projectId)}`;
 
-        const response = await fetch(
-            `${AI_BACKEND_URL}/api/get_project_status?project_id=${encodeURIComponent(projectId)}`,
-            {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }
-        );
+    console.log("[projects/status] ====== STATUS POLL ======");
+    console.log("[projects/status] Project ID:", projectId);
+    console.log("[projects/status] Backend URL:", statusUrl);
+
+    try {
+        const response = await fetch(statusUrl, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+
+        console.log("[projects/status] Response status:", response.status);
+
+        const responseText = await response.text();
+        console.log("[projects/status] Raw response:", responseText);
+
+        // Try to parse as JSON
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch {
+            console.error("[projects/status] Failed to parse JSON response");
+            return NextResponse.json({
+                project_id: projectId,
+                status: "not_found",
+                percent: 0,
+                step: "No active indexing"
+            });
+        }
+
+        console.log("[projects/status] Parsed data:", JSON.stringify(data, null, 2));
+        console.log("[projects/status] Status:", data.status);
+        console.log("[projects/status] Details:", JSON.stringify(data.details));
+        console.log("[projects/status] Stats fields - thread:", data.details?.thread_count, "msg:", data.details?.message_count, "pdf:", data.details?.pdf_count);
 
         if (!response.ok) {
-            // If 404, the project is not being indexed
             if (response.status === 404) {
                 return NextResponse.json({
                     project_id: projectId,
@@ -48,15 +72,12 @@ export async function GET(request: NextRequest) {
                 });
             }
 
-            const errorText = await response.text().catch(() => "Unknown error");
-            console.error("[projects/status] Backend error:", response.status, errorText);
             return NextResponse.json({
                 error: "Failed to get status",
-                details: errorText
+                details: responseText
             }, { status: response.status });
         }
 
-        const data = await response.json();
         return NextResponse.json(data);
 
     } catch (err) {

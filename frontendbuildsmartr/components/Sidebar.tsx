@@ -292,7 +292,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                               <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
                                 <div
                                   className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-all duration-300"
-                                  style={{ width: `${indexingStates[project.id]?.percent || 0}%` }}
+                                  style={{ width: `${Math.round(indexingStates[project.id]?.percent || 0)}%` }}
                                 />
                               </div>
                               <p className="text-[10px] text-muted-foreground mt-0.5 truncate">

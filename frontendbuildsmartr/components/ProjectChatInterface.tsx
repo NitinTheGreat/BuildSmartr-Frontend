@@ -4,12 +4,16 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
+import { MarkdownRenderer } from "@/components/MarkdownRenderer"
+import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip } from "lucide-react"
 import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile } from "@/types/project"
 import { EditFilesModal } from "./EditFilesModal"
 import { ShareProjectModal } from "./ShareProjectModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
 import { useProjects } from "@/contexts/ProjectContext"
+import { useIndexing } from "@/contexts/IndexingContext"
+import { useStreamingSearch } from "@/hooks/useStreamingSearch"
 
 interface SearchModeOption {
   id: SearchMode
@@ -47,16 +51,31 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { 
-    currentChatId, 
+  const {
+    currentChatId,
     setCurrentChatId,
     loadChatMessages,
-    createChat, 
+    createChat,
     addMessageToChat,
     updateChatTitle,
     deleteChat,
-    updateProject 
+    updateProject
   } = useProjects()
+
+  const { indexingStates } = useIndexing()
+  const projectIndexingState = indexingStates[project.id]
+  const indexingStats = projectIndexingState?.stats
+
+  // Streaming search hook
+  const {
+    isStreaming,
+    thinkingStatus,
+    streamedContent,
+    error: streamingError,
+    stats: streamingStats,
+    streamSearch,
+    reset: resetStreaming,
+  } = useStreamingSearch()
 
   const currentChat = project.chats.find(c => c.id === currentChatId)
   const messages = currentChat?.messages || []
@@ -111,7 +130,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
   const handleModeToggle = (mode: SearchMode) => {
     const option = searchModeOptions.find(o => o.id === mode)
-    
+
     if (option?.exclusive) {
       if (selectedModes.includes(mode)) {
         setSelectedModes([])
@@ -188,9 +207,11 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim() || isSubmitting) return
+    if (!query.trim() || isSubmitting || isStreaming) return
 
     setIsSubmitting(true)
+    resetStreaming()
+
     try {
       // If no current chat, create one
       let chatId = currentChatId
@@ -215,19 +236,34 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
       const currentQuery = query.trim()
       setQuery("")
+      setIsSubmitting(false)
 
-      // Simulate AI response (replace with actual API call)
-      setTimeout(async () => {
-        const modesText = selectedModes.length > 0 
-          ? `Using ${selectedModes.join(', ')} mode(s), ` 
-          : ''
-        const assistantMessage = {
-          role: 'assistant' as const,
-          content: `${modesText}I understand you're asking about "${currentQuery}" in the context of your project "${project.name}". ${project.description ? `Based on your project description: "${project.description}"` : ''} ${project.files.length > 0 ? `I can see you have ${project.files.length} file(s) attached to this project.` : ''} How can I help you further?`,
+      // Use streaming search API
+      try {
+        const aiResponse = await streamSearch(project.name, currentQuery)
+
+        // Save the final response as assistant message
+        if (aiResponse) {
+          const assistantMessage = {
+            role: 'assistant' as const,
+            content: aiResponse,
+          }
+          await addMessageToChat(project.id, chatId!, assistantMessage)
+          // Reset streaming state so the bubble disappears
+          resetStreaming()
         }
-        await addMessageToChat(project.id, chatId!, assistantMessage)
-      }, 1000)
-    } finally {
+      } catch (streamError) {
+        console.error('Streaming search error:', streamError)
+        // Add error message as assistant response
+        const errorMessage = {
+          role: 'assistant' as const,
+          content: `Sorry, I encountered an error while searching: ${streamError instanceof Error ? streamError.message : 'Unknown error'}. Please try again.`,
+        }
+        await addMessageToChat(project.id, chatId!, errorMessage)
+        resetStreaming()
+      }
+    } catch (error) {
+      console.error('Failed to submit message:', error)
       setIsSubmitting(false)
     }
   }
@@ -279,7 +315,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           onClose={() => setPreviewFile(null)}
           file={previewFile}
         />
-        
+
         <div className="min-h-screen flex flex-col">
           {/* Header */}
           <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
@@ -335,11 +371,10 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                           return (
                             <span
                               key={mode}
-                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
-                                message.role === 'user' 
-                                  ? 'bg-background/20 text-background' 
-                                  : 'bg-accent/20 text-accent'
-                              }`}
+                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${message.role === 'user'
+                                ? 'bg-background/20 text-background'
+                                : 'bg-accent/20 text-accent'
+                                }`}
                             >
                               <Icon className="w-2.5 h-2.5" />
                               {getModeLabel(mode)}
@@ -348,10 +383,64 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                         })}
                       </div>
                     )}
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    {message.role === 'assistant' ? (
+                      <MarkdownRenderer content={message.content} />
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    )}
                   </div>
                 </motion.div>
               ))}
+
+              {/* Streaming message bubble */}
+              {(isStreaming || streamedContent) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex justify-start"
+                >
+                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-[#2b2d31] text-foreground rounded-bl-md">
+                    {/* Thinking status */}
+                    {thinkingStatus && !streamedContent && (
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <Spinner size="sm" variant="dots" />
+                        <span>{thinkingStatus}</span>
+                      </div>
+                    )}
+
+                    {/* Streamed content */}
+                    {streamedContent && (
+                      <div>
+                        <MarkdownRenderer content={streamedContent} />
+                        {isStreaming && (
+                          <span className="inline-block w-2 h-4 ml-1 bg-accent animate-pulse" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Stats after completion */}
+                    {streamingStats && !isStreaming && (
+                      <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                        Search: {streamingStats.searchTimeMs}ms • LLM: {streamingStats.llmTimeMs}ms
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Streaming error */}
+              {streamingError && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex justify-start"
+                >
+                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 rounded-bl-md">
+                    <p className="text-sm">⚠️ {streamingError}</p>
+                  </div>
+                </motion.div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -512,7 +601,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                         <Button
                           type="submit"
                           size="icon"
-                          disabled={!query.trim()}
+                          disabled={!query.trim() || isStreaming}
                           className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-8 w-8"
                           aria-label="Send"
                         >
@@ -553,7 +642,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         onClose={() => setPreviewFile(null)}
         file={previewFile}
       />
-      
+
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
         {/* Project Header - Editable */}
         <div className="mb-8 text-center">
@@ -583,7 +672,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
             ) : (
               <div className="flex items-center gap-2 group">
                 <h1 className="text-3xl font-bold text-foreground">{project.name}</h1>
-                <button 
+                <button
                   onClick={() => setIsEditingName(true)}
                   className="p-2 hover:bg-[#3c3f45] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                 >
@@ -626,7 +715,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               </div>
             </div>
           ) : (
-            <div 
+            <div
               className="group cursor-pointer max-w-lg mx-auto"
               onClick={() => setIsEditingDescription(true)}
             >
@@ -673,18 +762,17 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               </Button>
             </div>
           </div>
-          
+
           {project.files.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {project.files.map(file => (
                 <div
                   key={file.id}
                   onClick={() => handleFileClick(file)}
-                  className={`flex items-center gap-2 px-3 py-2 bg-[#2b2d31] border border-border rounded-lg ${
-                    isPreviewable(file) 
-                      ? 'cursor-pointer hover:bg-[#3c3f45] hover:border-accent/50 transition-colors' 
-                      : ''
-                  }`}
+                  className={`flex items-center gap-2 px-3 py-2 bg-[#2b2d31] border border-border rounded-lg ${isPreviewable(file)
+                    ? 'cursor-pointer hover:bg-[#3c3f45] hover:border-accent/50 transition-colors'
+                    : ''
+                    }`}
                   title={isPreviewable(file) ? 'Click to preview' : undefined}
                 >
                   {getCategoryIcon(file.category)}
@@ -710,6 +798,41 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           )}
         </div>
 
+        {/* Email Data Section */}
+        {indexingStats && (indexingStats.thread_count > 0 || indexingStats.message_count > 0 || indexingStats.pdf_count > 0) && (
+          <div className="w-full max-w-2xl mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Mail className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-foreground">
+                Indexed Email Data
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-[#2b2d31] border border-border rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <MessageSquare className="w-5 h-5 text-accent" />
+                </div>
+                <p className="text-xl font-semibold text-foreground">{indexingStats.thread_count || 0}</p>
+                <p className="text-xs text-muted-foreground">Conversations</p>
+              </div>
+              <div className="bg-[#2b2d31] border border-border rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <Mail className="w-5 h-5 text-accent" />
+                </div>
+                <p className="text-xl font-semibold text-foreground">{indexingStats.message_count || 0}</p>
+                <p className="text-xs text-muted-foreground">Messages</p>
+              </div>
+              <div className="bg-[#2b2d31] border border-border rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <Paperclip className="w-5 h-5 text-accent" />
+                </div>
+                <p className="text-xl font-semibold text-foreground">{indexingStats.pdf_count || 0}</p>
+                <p className="text-xs text-muted-foreground">Attachments</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Chats Section */}
         <div className="w-full max-w-2xl mb-8">
           <div className="flex items-center justify-between mb-3">
@@ -726,7 +849,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               New Chat
             </Button>
           </div>
-          
+
           {project.chats.length > 0 ? (
             <div className="space-y-2">
               {project.chats.map(chat => (
@@ -788,7 +911,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                     <Button
                       type="submit"
                       size="icon"
-                      disabled={!query.trim()}
+                      disabled={!query.trim() || isStreaming}
                       className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50"
                       aria-label="Send"
                     >

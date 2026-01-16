@@ -36,7 +36,7 @@ export function ProjectIndexingModal({
 
     const isCompleted = indexingState?.status === 'completed'
     const isError = indexingState?.status === 'error'
-    const percent = indexingState?.percent || 0
+    const percent = Math.round(indexingState?.percent || 0)
     const step = indexingState?.currentStep || 'Initializing...'
     const stats = indexingState?.stats
 

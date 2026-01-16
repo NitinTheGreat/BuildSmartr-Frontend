@@ -127,14 +127,14 @@ export function FloatingProgressIndicator() {
                         <span className="text-sm text-foreground font-medium truncate max-w-[180px]">
                             {primaryState.projectName}
                         </span>
-                        <span className="text-xs text-accent font-medium">{primaryState.percent}%</span>
+                        <span className="text-xs text-accent font-medium">{Math.round(primaryState.percent)}%</span>
                     </div>
 
                     {/* Progress bar */}
                     <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden mb-2">
                         <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: `${primaryState.percent}%` }}
+                            animate={{ width: `${Math.round(primaryState.percent)}%` }}
                             transition={{ duration: 0.3 }}
                             className="h-full rounded-full relative"
                             style={{
@@ -180,7 +180,7 @@ export function FloatingProgressIndicator() {
                                             {state.projectName}
                                         </span>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs text-muted-foreground">{state.percent}%</span>
+                                            <span className="text-xs text-muted-foreground">{Math.round(state.percent)}%</span>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation()
@@ -195,7 +195,7 @@ export function FloatingProgressIndicator() {
                                     <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
                                         <div
                                             className="h-full rounded-full bg-accent"
-                                            style={{ width: `${state.percent}%` }}
+                                            style={{ width: `${Math.round(state.percent)}%` }}
                                         />
                                     </div>
                                 </div>

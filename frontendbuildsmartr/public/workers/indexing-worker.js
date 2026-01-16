@@ -1,12 +1,9 @@
 /**
  * Web Worker for background email indexing with real-time polling
- * Survives page navigation and persists results to IndexedDB
- * 
- * IMPORTANT: The /api/projects/index endpoint is synchronous and blocks until
- * indexing is complete. We need to start polling IMMEDIATELY in parallel.
+ * DEBUG VERSION - Extensive logging enabled
  */
 
-// IndexedDB helpers (duplicated for worker context)
+// IndexedDB helpers
 const DB_NAME = 'donna_indexing';
 const DB_VERSION = 1;
 const STORE_NAME = 'indexing_states';
@@ -37,46 +34,65 @@ async function saveState(state) {
     });
 }
 
-// Polling configuration
-const POLL_INTERVAL = 1500; // 1.5 seconds
-const MAX_POLL_DURATION = 15 * 60 * 1000; // 15 minutes max
+// Config
+const POLL_INTERVAL = 1500;
+const MAX_POLL_DURATION = 15 * 60 * 1000;
 
-// Normalize project name to ID (same logic as backend)
+// Normalize project ID
 function normalizeProjectId(projectName) {
-    return projectName
+    const normalized = projectName
         .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .replace(/\s+/g, '_')
+        .replace(/[\s\-]+/g, '_')
+        .replace(/[^a-z0-9_]/g, '')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
         .trim();
+    console.log('[WORKER] Normalized:', projectName, '→', normalized);
+    return normalized;
 }
 
-// Poll the status endpoint
+// Poll status
 async function pollStatus(projectId) {
-    const response = await fetch(`/api/projects/status?project_id=${encodeURIComponent(projectId)}`);
+    const url = `/api/projects/status?project_id=${encodeURIComponent(projectId)}`;
+    console.log('[WORKER] Polling:', url);
+
+    const response = await fetch(url);
+    const text = await response.text();
+
+    console.log('[WORKER] Poll response status:', response.status);
+    console.log('[WORKER] Poll response body:', text);
 
     if (!response.ok) {
         throw new Error(`Status check failed: ${response.status}`);
     }
 
-    return response.json();
+    return JSON.parse(text);
 }
 
-// Sleep helper
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Handle messages from main thread
+// Main handler
 self.onmessage = async (event) => {
+    console.log('[WORKER] ========================================');
+    console.log('[WORKER] MESSAGE RECEIVED:', JSON.stringify(event.data));
+    console.log('[WORKER] ========================================');
+
     const { type, projectId, projectName, apiUrl } = event.data;
 
-    if (type !== 'start') return;
+    if (type !== 'start') {
+        console.log('[WORKER] Ignoring non-start message');
+        return;
+    }
 
-    // Normalize project ID to match backend format
     const normalizedProjectId = normalizeProjectId(projectName);
 
-    console.log('[Worker] Starting indexing for:', projectName);
-    console.log('[Worker] Normalized project ID:', normalizedProjectId);
+    console.log('[WORKER] Starting indexing...');
+    console.log('[WORKER] Project ID:', projectId);
+    console.log('[WORKER] Project Name:', projectName);
+    console.log('[WORKER] Normalized ID:', normalizedProjectId);
+    console.log('[WORKER] API URL:', apiUrl);
 
     // Initial state
     const initialState = {
@@ -94,42 +110,53 @@ self.onmessage = async (event) => {
     let indexingComplete = false;
     let indexingError = null;
     let lastPercent = 0;
+    let pollCount = 0;
 
-    // Start the index request (DO NOT AWAIT - it's synchronous and blocks!)
-    // Fire and forget - the polling will track the progress
-    const indexPromise = fetch(apiUrl, {
+    // Fire index request (don't await!)
+    console.log('[WORKER] Firing index request to:', apiUrl);
+
+    fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_name: projectName }),
     }).then(async (response) => {
+        console.log('[WORKER] Index API returned, status:', response.status);
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-            throw new Error(errorData.error || errorData.message || 'Indexing failed to start');
+            console.log('[WORKER] Index API error:', errorData);
+            indexingError = errorData.error || 'Indexing failed to start';
+        } else {
+            const result = await response.json();
+            console.log('[WORKER] Index API success:', JSON.stringify(result));
+            indexingComplete = true;
         }
-        const result = await response.json();
-        console.log('[Worker] Index API returned:', result.status);
-        indexingComplete = true;
-        return result;
     }).catch((error) => {
-        console.error('[Worker] Index API error:', error.message);
+        console.error('[WORKER] Index API fetch error:', error.message);
         indexingError = error.message;
     });
 
-    // Give the backend a moment to start processing
+    // Wait a bit for backend to start
+    console.log('[WORKER] Waiting 500ms before polling...');
     await sleep(500);
 
-    // Start polling IMMEDIATELY (in parallel with the index request)
+    // Start polling
+    console.log('[WORKER] Starting poll loop...');
     const startTime = Date.now();
 
     while (!indexingComplete && !indexingError && (Date.now() - startTime) < MAX_POLL_DURATION) {
+        pollCount++;
+        console.log('[WORKER] ---- Poll #' + pollCount + ' ----');
+
         try {
             const statusData = await pollStatus(normalizedProjectId);
 
-            console.log('[Worker] Poll response:', statusData.status, statusData.percent + '%');
+            console.log('[WORKER] Status:', statusData.status);
+            console.log('[WORKER] Percent:', statusData.percent);
+            console.log('[WORKER] Step:', statusData.step);
 
-            // Handle different status values
-            if (statusData.status === 'completed') {
-                // Indexing complete!
+            if (statusData.status === 'completed' || statusData.percent >= 100) {
+                console.log('[WORKER] COMPLETED!');
+
                 const completedState = {
                     projectId,
                     projectName,
@@ -138,11 +165,7 @@ self.onmessage = async (event) => {
                     currentStep: 'All done! Your project is ready.',
                     startedAt: initialState.startedAt,
                     completedAt: Date.now(),
-                    stats: {
-                        thread_count: statusData.details?.thread_count || 0,
-                        message_count: statusData.details?.message_count || 0,
-                        pdf_count: statusData.details?.pdf_count || 0,
-                    },
+                    stats: statusData.details,
                 };
 
                 await saveState(completedState);
@@ -152,61 +175,61 @@ self.onmessage = async (event) => {
                     result: { stats: completedState.stats }
                 });
 
-                console.log('[Worker] Indexing completed successfully');
                 return;
             }
 
             if (statusData.status === 'error') {
+                console.log('[WORKER] ERROR from status:', statusData.error);
                 throw new Error(statusData.error || 'Indexing failed');
             }
 
             if (statusData.status === 'not_found') {
-                // Backend might not have started yet, or project ID mismatch
-                // Just continue polling
-                console.log('[Worker] Status not found yet, continuing to poll...');
-            } else {
-                // Update progress (status === 'indexing')
+                console.log('[WORKER] Status not_found, continuing...');
+            } else if (statusData.status === 'indexing') {
                 const percent = statusData.percent || 0;
                 const step = statusData.step || 'Processing...';
-                const stats = statusData.details || null;
 
-                // Only update if progress has changed
-                if (percent !== lastPercent || step !== initialState.currentStep) {
+                if (percent !== lastPercent) {
+                    console.log('[WORKER] Progress update:', percent, '%');
                     lastPercent = percent;
 
-                    const progressState = {
+                    await saveState({
                         projectId,
                         projectName,
                         status: 'indexing',
                         percent,
                         currentStep: step,
                         startedAt: initialState.startedAt,
-                        stats,
-                    };
+                        stats: statusData.details,
+                    });
 
-                    await saveState(progressState);
                     self.postMessage({
                         type: 'progress',
                         projectId,
                         percent,
                         step,
-                        stats
+                        stats: statusData.details
                     });
                 }
             }
 
         } catch (pollError) {
-            console.error('[Worker] Poll error:', pollError.message);
-            // Continue polling on transient errors
+            console.error('[WORKER] Poll error:', pollError.message);
         }
 
-        // Wait before next poll
+        console.log('[WORKER] Sleeping ' + POLL_INTERVAL + 'ms...');
         await sleep(POLL_INTERVAL);
     }
 
-    // If we exited the loop, check if there was an error from the index request
+    // Check final state
+    console.log('[WORKER] Exited poll loop');
+    console.log('[WORKER] indexingComplete:', indexingComplete);
+    console.log('[WORKER] indexingError:', indexingError);
+    console.log('[WORKER] pollCount:', pollCount);
+
     if (indexingError) {
-        const errorState = {
+        console.log('[WORKER] Reporting error:', indexingError);
+        await saveState({
             projectId,
             projectName,
             status: 'error',
@@ -214,71 +237,28 @@ self.onmessage = async (event) => {
             currentStep: 'Indexing failed',
             startedAt: initialState.startedAt,
             error: indexingError,
-        };
-
-        await saveState(errorState);
+        });
         self.postMessage({ type: 'error', projectId, error: indexingError });
         return;
     }
 
-    // If the index promise completed, wait for final result
     if (indexingComplete) {
-        try {
-            await indexPromise;
-
-            // Do one final poll to get the completion status
-            const finalStatus = await pollStatus(normalizedProjectId);
-
-            if (finalStatus.status === 'completed') {
-                const completedState = {
-                    projectId,
-                    projectName,
-                    status: 'completed',
-                    percent: 100,
-                    currentStep: 'All done! Your project is ready.',
-                    startedAt: initialState.startedAt,
-                    completedAt: Date.now(),
-                    stats: finalStatus.details,
-                };
-
-                await saveState(completedState);
-                self.postMessage({
-                    type: 'complete',
-                    projectId,
-                    result: { stats: completedState.stats }
-                });
-            } else {
-                // Assume completed since index request succeeded
-                const completedState = {
-                    projectId,
-                    projectName,
-                    status: 'completed',
-                    percent: 100,
-                    currentStep: 'All done! Your project is ready.',
-                    startedAt: initialState.startedAt,
-                    completedAt: Date.now(),
-                };
-
-                await saveState(completedState);
-                self.postMessage({ type: 'complete', projectId, result: {} });
-            }
-        } catch (err) {
-            self.postMessage({ type: 'error', projectId, error: err.message });
-        }
+        console.log('[WORKER] Index completed, marking as done');
+        await saveState({
+            projectId,
+            projectName,
+            status: 'completed',
+            percent: 100,
+            currentStep: 'All done! Your project is ready.',
+            startedAt: initialState.startedAt,
+            completedAt: Date.now(),
+        });
+        self.postMessage({ type: 'complete', projectId, result: {} });
         return;
     }
 
-    // Timeout reached
-    const errorState = {
-        projectId,
-        projectName,
-        status: 'error',
-        percent: lastPercent,
-        currentStep: 'Indexing timed out',
-        startedAt: initialState.startedAt,
-        error: 'Indexing timed out - exceeded maximum duration',
-    };
-
-    await saveState(errorState);
+    console.log('[WORKER] Timeout!');
     self.postMessage({ type: 'error', projectId, error: 'Indexing timed out' });
 };
+
+console.log('[WORKER] Indexing worker loaded and ready!');
