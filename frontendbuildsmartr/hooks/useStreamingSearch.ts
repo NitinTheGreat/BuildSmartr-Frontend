@@ -13,6 +13,7 @@ import type {
 } from '@/types/streaming'
 
 const AI_BACKEND_URL = process.env.NEXT_PUBLIC_AI_BACKEND_URL || 'http://localhost:7071'
+const AZURE_FUNCTION_KEY = process.env.NEXT_PUBLIC_AZURE_FUNCTION_KEY || ''
 
 const initialState: StreamingSearchState = {
     isStreaming: false,
@@ -77,6 +78,7 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'x-functions-key': AZURE_FUNCTION_KEY,
                 },
                 body: JSON.stringify({
                     project_id: projectId,

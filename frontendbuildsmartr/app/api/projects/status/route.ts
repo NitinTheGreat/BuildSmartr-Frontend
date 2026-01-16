@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 const AI_BACKEND_URL = process.env.NEXT_PUBLIC_AI_BACKEND_URL || "http://localhost:7071";
+const AZURE_FUNCTION_KEY = process.env.NEXT_PUBLIC_AZURE_FUNCTION_KEY || "";
 
 /**
  * GET /api/projects/status?project_id={project_id}
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
+                "x-functions-key": AZURE_FUNCTION_KEY,
             },
         });
 
