@@ -14,17 +14,21 @@ export function FloatingProgressIndicator() {
 
     // Get all active or recently completed states
     const activeStates = Object.values(indexingStates).filter(
-        s => s.status === 'indexing' || s.status === 'pending' ||
+        s => s.status === 'indexing' || s.status === 'vectorizing' || s.status === 'pending' ||
             (s.status === 'completed' && s.completedAt && Date.now() - s.completedAt < 30000) ||
             s.status === 'error'
     )
+
+    // Debug log
+    console.log(`🔍 FloatingProgressIndicator | states=${Object.keys(indexingStates).length} | active=${activeStates.length}`, indexingStates)
 
     if (activeStates.length === 0) return null
 
     const primaryState = activeStates[0]
     const isCompleted = primaryState.status === 'completed'
     const isError = primaryState.status === 'error'
-    const isIndexing = primaryState.status === 'indexing' || primaryState.status === 'pending'
+    const isIndexing = primaryState.status === 'indexing' || primaryState.status === 'vectorizing' || primaryState.status === 'pending'
+    const isVectorizing = primaryState.status === 'vectorizing'
 
     if (isMinimized) {
         return (
@@ -86,7 +90,7 @@ export function FloatingProgressIndicator() {
                         {isCompleted && <CheckCircle2 className="w-4 h-4 text-green-400" />}
                         {isError && <AlertCircle className="w-4 h-4 text-red-400" />}
                         <span className="text-sm font-medium text-foreground">
-                            {isCompleted ? 'Indexing Complete' : isError ? 'Indexing Failed' : 'Indexing in Progress'}
+                            {isCompleted ? 'Indexing Complete' : isError ? 'Indexing Failed' : isVectorizing ? 'Training AI...' : 'Indexing Emails...'}
                         </span>
                         {activeStates.length > 1 && (
                             <span className="text-xs bg-muted/50 text-muted-foreground px-1.5 py-0.5 rounded">

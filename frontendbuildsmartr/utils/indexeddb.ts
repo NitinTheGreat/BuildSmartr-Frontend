@@ -3,26 +3,12 @@
  * Enables background processing to survive page navigation
  */
 
+import type { ProjectIndexingState } from '@/types/project';
+
 const DB_NAME = 'donna_indexing';
 const DB_VERSION = 1;
 const STORE_NAME = 'indexing_states';
 
-interface ProjectIndexingState {
-    projectId: string;
-    projectName: string;
-    status: 'pending' | 'indexing' | 'completed' | 'error';
-    percent: number;
-    currentStep: string;
-    startedAt: number;
-    completedAt?: number;
-    error?: string;
-    stats?: {
-        thread_count: number;
-        message_count: number;
-        pdf_count: number;
-        vector_count?: number;
-    };
-}
 
 function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {

@@ -73,11 +73,19 @@ export interface Project {
 // Indexing Types
 // ============================================
 
+/** Indexing status values from the backend */
+export type IndexingStatus = 'pending' | 'indexing' | 'vectorizing' | 'completed' | 'error' | 'not_found'
+
 export interface ProjectIndexingState {
   projectId: string
   projectName: string
-  status: 'pending' | 'indexing' | 'completed' | 'error'
+  /** Backend project ID (e.g., "youtube_a1b2c3d4") used for API calls */
+  backendProjectId?: string
+  status: IndexingStatus
+  /** Short phase name: "Searching", "Processing PDFs", "Creating Embeddings" */
+  phase?: string
   percent: number
+  /** Full step message: "Searching for project-related emails..." */
   currentStep: string
   startedAt: number
   completedAt?: number
@@ -90,15 +98,38 @@ export interface ProjectIndexingState {
   }
 }
 
+/**
+ * Response from GET /api/get_project_status
+ */
+export interface ProgressStatusResponse {
+  project_id: string
+  status: IndexingStatus
+  /** Short phase name: "Searching", "Processing PDFs", "Creating Embeddings" */
+  phase?: string
+  /** Full step message: "Searching for project-related emails..." */
+  step?: string
+  percent: number
+  details?: {
+    thread_count: number
+    message_count: number
+    pdf_count: number
+  }
+  updated_at?: number
+  error?: string
+}
+
 export interface IndexingProgressLog {
   step: string
   percent: number
   timestamp: number
 }
 
+
 export interface IndexingResponse {
   status: string
+  /** Unique project ID with user hash suffix (e.g., "youtube_a1b2c3d4"). Use for all API calls. */
   project_id: string
+  /** Human-readable project name (e.g., "YouTube"). Display to users. */
   project_name: string
   stats: {
     thread_count: number

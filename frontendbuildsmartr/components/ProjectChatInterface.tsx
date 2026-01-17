@@ -240,7 +240,19 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
       // Use streaming search API
       try {
-        const aiResponse = await streamSearch(project.name, currentQuery)
+        // Get the backend project_id from indexing state for search
+        const backendProjectId = projectIndexingState?.backendProjectId
+        if (!backendProjectId) {
+          console.error('[ProjectChatInterface] No backendProjectId - project may not be indexed yet')
+          const errorMessage = {
+            role: 'assistant' as const,
+            content: 'This project hasn\'t been indexed yet. Please index your emails first to enable AI search.',
+          }
+          await addMessageToChat(project.id, chatId!, errorMessage)
+          return
+        }
+
+        const aiResponse = await streamSearch(backendProjectId, currentQuery)
 
         // Save the final response as assistant message
         if (aiResponse) {
