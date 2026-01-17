@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
 import AuthButtons from "@/components/AuthButtons";
 import AuthStateListener from "@/components/AuthStateListener";
 
@@ -8,10 +9,9 @@ export default async function Page() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  console.log("[page.tsx] user:", user?.email ?? "not authenticated");
-
+  // Redirect signed-in users to the chat page with the welcome experience
   if (user) {
-    return <div className="p-4 text-foreground">You are signed in as {user.email}.</div>;
+    redirect("/chat");
   }
 
   return (
@@ -38,8 +38,6 @@ export default async function Page() {
               <AuthButtons />
             </div>
           </div>
-          
-          
         </div>
       </div>
     </>

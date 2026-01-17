@@ -7,6 +7,7 @@ import { TopBar } from "@/components/TopBar"
 import { createClient } from "@/utils/supabase/server"
 import { ProjectProvider } from "@/contexts/ProjectContext"
 import { IndexingProvider } from "@/contexts/IndexingContext"
+import { UserProvider } from "@/contexts/UserContext"
 import { FloatingProgressIndicator } from "@/components/FloatingProgressIndicator"
 import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
@@ -89,9 +90,6 @@ export default async function RootLayout({
   const fullName = (user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? null) as string | null
   const firstName = fullName?.split(" ")[0] ?? null
 
-  console.log("[layout] full user object:", JSON.stringify(user, null, 2))
-  console.log("[layout] avatarUrl:", avatarUrl)
-
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <head>
@@ -102,16 +100,23 @@ export default async function RootLayout({
         <meta name="theme-color" content="#1f2121" media="(prefers-color-scheme: light)" />
       </head>
       <body className="font-sans antialiased safe-area-all scroll-smooth-ios">
-        <ProjectProvider>
-          <IndexingProvider>
-            {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
-            {user && <TopBar userName={firstName || fullName} />}
-            <main className={user ? "ml-0 md:ml-20 transition-all duration-300 ease-out min-h-screen-safe" : "min-h-screen"}>
-              {children}
-            </main>
-            {user && <FloatingProgressIndicator />}
-          </IndexingProvider>
-        </ProjectProvider>
+        <UserProvider
+          initialAvatarUrl={avatarUrl}
+          initialFirstName={firstName}
+          initialFullName={fullName}
+          initialEmail={user?.email ?? null}
+        >
+          <ProjectProvider>
+            <IndexingProvider>
+              {user && <Sidebar />}
+              {user && <TopBar />}
+              <main className={user ? "ml-0 md:ml-20 transition-all duration-300 ease-out min-h-screen-safe" : "min-h-screen"}>
+                {children}
+              </main>
+              {user && <FloatingProgressIndicator />}
+            </IndexingProvider>
+          </ProjectProvider>
+        </UserProvider>
         <Analytics />
       </body>
     </html>

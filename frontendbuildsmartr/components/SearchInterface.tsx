@@ -5,24 +5,11 @@ import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { Sparkles, Globe, Mail, Quote, FileText, Mic, ChevronDown, X } from "lucide-react"
+import { Sparkles, Globe, Mic, ChevronDown, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
-import type { SearchMode, ChatMessage } from "@/types/project"
-
-interface SearchModeOption {
-  id: SearchMode
-  label: string
-  icon: React.ElementType
-  exclusive?: boolean
-}
-
-const searchModeOptions: SearchModeOption[] = [
-  { id: 'web', label: 'Web Search', icon: Globe },
-  { id: 'email', label: 'Email Search', icon: Mail },
-  { id: 'quotes', label: 'Quotes', icon: Quote },
-  { id: 'pdf', label: 'PDF Search', icon: FileText, exclusive: true },
-]
+import type { SearchMode } from "@/types/project"
+import { SEARCH_MODE_OPTIONS, getModeIcon, getModeLabel, isModeExclusive } from "@/lib/constants"
 
 export function SearchInterface() {
   const [query, setQuery] = useState("")
@@ -55,9 +42,7 @@ export function SearchInterface() {
   }, [])
 
   const handleModeToggle = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    
-    if (option?.exclusive) {
+    if (isModeExclusive(mode)) {
       // If PDF is selected, clear all others and only select PDF
       if (selectedModes.includes(mode)) {
         setSelectedModes([])
@@ -117,16 +102,6 @@ export function SearchInterface() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const getModeIcon = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.icon || Globe
-  }
-
-  const getModeLabel = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.label || mode
   }
 
   return (
@@ -211,7 +186,7 @@ export function SearchInterface() {
                       transition={{ duration: 0.15 }}
                       className="absolute right-0 bottom-full mb-2 bg-[#2b2d31] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
                     >
-                      {searchModeOptions.map((option) => {
+                      {SEARCH_MODE_OPTIONS.map((option) => {
                         const Icon = option.icon
                         const isSelected = selectedModes.includes(option.id)
                         const isDisabled = option.exclusive 

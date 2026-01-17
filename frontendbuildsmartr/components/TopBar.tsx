@@ -1,20 +1,24 @@
 "use client"
 
-import { useState } from "react"
-import { Share2 } from "lucide-react"
-import { ShareIIVYModal } from "./ShareIIVYModal"
-import { motion } from "framer-motion"
+// DEMO: Share button hidden for demo
+// import { useState } from "react"
+// import { Share2 } from "lucide-react"
+// import { ShareIIVYModal } from "./ShareIIVYModal"
+// import { motion } from "framer-motion"
+// import { useUser } from "@/contexts/UserContext"
 
-interface TopBarProps {
-  userName?: string | null
-}
+export function TopBar() {
+  // DEMO: Share button hidden for demo
+  return null
 
-export function TopBar({ userName }: TopBarProps) {
+  /* DEMO: Original Share button code
+  const { user } = useUser()
+  const userName = user.firstName || user.fullName
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
 
   return (
     <>
-      <motion.div 
+      <motion.div
         className="fixed z-50"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -42,4 +46,5 @@ export function TopBar({ userName }: TopBarProps) {
       />
     </>
   )
+  */
 }

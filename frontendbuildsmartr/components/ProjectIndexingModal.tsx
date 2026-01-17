@@ -11,6 +11,7 @@ interface ProjectIndexingModalProps {
     isOpen: boolean
     onClose: () => void
     onContinueInBackground: () => void
+    onCancel?: () => void
     indexingState: ProjectIndexingState | null
     projectId?: string
 }
@@ -19,6 +20,7 @@ export function ProjectIndexingModal({
     isOpen,
     onClose,
     onContinueInBackground,
+    onCancel,
     indexingState,
     projectId
 }: ProjectIndexingModalProps) {
@@ -244,13 +246,24 @@ export function ProjectIndexingModal({
                                         </Button>
                                     </>
                                 ) : (
-                                    <Button
-                                        onClick={onContinueInBackground}
-                                        variant="outline"
-                                        className="flex-1 border-border hover:bg-muted/30"
-                                    >
-                                        Continue in background
-                                    </Button>
+                                    <>
+                                        {onCancel && (
+                                            <Button
+                                                onClick={onCancel}
+                                                variant="outline"
+                                                className="flex-1 border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                            >
+                                                Stop Processing
+                                            </Button>
+                                        )}
+                                        <Button
+                                            onClick={onContinueInBackground}
+                                            variant="outline"
+                                            className="flex-1 border-border hover:bg-muted/30"
+                                        >
+                                            Continue in background
+                                        </Button>
+                                    </>
                                 )}
                             </div>
                         </div>

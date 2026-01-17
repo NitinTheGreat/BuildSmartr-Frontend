@@ -27,8 +27,7 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Refresh the session so it doesn't expire
-  const { data: { user } } = await supabase.auth.getUser();
-  console.log("[middleware] path:", request.nextUrl.pathname, "user:", user?.email ?? "none");
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

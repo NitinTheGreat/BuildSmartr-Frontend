@@ -60,7 +60,7 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
     other: useRef<HTMLInputElement>(null),
   }
   const { createProject } = useProjects()
-  const { startIndexing, indexingStates } = useIndexing()
+  const { startIndexing, indexingStates, dismissIndexing } = useIndexing()
   const router = useRouter()
 
   // Check email connection when modal opens
@@ -399,8 +399,8 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                 </div>
               )}
 
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+              {/* Form - DEMO: Simplified to only project name */}
+              <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
                 {/* Project Name */}
                 <div>
                   <label htmlFor="projectName" className="block text-sm font-medium text-foreground mb-2">
@@ -412,109 +412,52 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter project name..."
-                    className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-smooth"
+                    className="w-full px-4 py-3 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-smooth text-base"
                     required
+                    autoFocus
                     disabled={!emailConnection.isConnected}
                   />
-                  <p className="text-xs text-muted-foreground mt-1.5">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Emails related to this project will be automatically indexed
                   </p>
                 </div>
-                {/* Description */}
+
+                {/* DEMO: Extra fields commented out for demo
                 <div>
-                  <label htmlFor="projectDescription" className="block text-sm font-medium text-foreground mb-2">
-                    Description
-                    <span className="text-muted-foreground font-normal ml-1">(helps AI understand context)</span>
-                  </label>
-                  <textarea
-                    id="projectDescription"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe what this project is about..."
-                    rows={3}
-                    className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none transition-smooth"
-                    disabled={!emailConnection.isConnected}
-                  />
+                  <label htmlFor="projectDescription">Description</label>
+                  <textarea id="projectDescription" value={description} onChange={(e) => setDescription(e.target.value)} />
                 </div>
-                {/* Company Address */}
                 <div>
-                  <label htmlFor="companyAddress" className="block text-sm font-medium text-foreground mb-2">
-                    Company Address
-                    <span className="text-muted-foreground font-normal ml-1">(optional)</span>
-                  </label>
-                  <input
-                    id="companyAddress"
-                    type="text"
-                    value={companyAddress}
-                    onChange={(e) => setCompanyAddress(e.target.value)}
-                    placeholder="Enter company address..."
-                    className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-smooth"
-                    disabled={!emailConnection.isConnected}
-                  />
+                  <label htmlFor="companyAddress">Company Address</label>
+                  <input id="companyAddress" value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
                 </div>
-                {/* Tags */}
                 <div>
-                  <label htmlFor="tags" className="block text-sm font-medium text-foreground mb-2">
-                    Tags
-                    <span className="text-muted-foreground font-normal ml-1">(press Enter to add)</span>
-                  </label>
-                  <input
-                    id="tags"
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleTagKeyDown}
-                    placeholder="Type a tag and press Enter..."
-                    className="w-full px-3 py-2 bg-[#1f2121] border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-smooth"
-                    disabled={!emailConnection.isConnected}
-                  />
-                  {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-accent/20 text-accent text-sm rounded-md animate-fade-in"
-                        >
-                          {tag}
-                          <button
-                            type="button"
-                            onClick={() => removeTag(tag)}
-                            className="hover:text-red-400 transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <label htmlFor="tags">Tags</label>
+                  <input id="tags" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} />
                 </div>
-                {/* File Upload - 3 Categories */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-3">
-                    Upload Files
-                    <span className="text-muted-foreground font-normal ml-1">(optional)</span>
-                  </label>
-                  <div className={`grid grid-cols-3 gap-3 ${!emailConnection.isConnected ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <FileUploadBox category="construction" />
-                    <FileUploadBox category="architectural" />
-                    <FileUploadBox category="other" />
-                  </div>
+                  <label>Upload Files</label>
+                  <FileUploadBox category="construction" />
+                  <FileUploadBox category="architectural" />
+                  <FileUploadBox category="other" />
                 </div>
+                */}
+
                 {/* Actions */}
-                <div className="flex justify-end gap-3 pt-2">
+                <div className="flex justify-end gap-3 pt-4 border-t border-border">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={onClose}
                     disabled={isSubmitting}
-                    className="bg-transparent border-border hover:bg-[#3c3f45]"
+                    className="bg-transparent border-border hover:bg-[#3c3f45] px-6"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     disabled={!name.trim() || isSubmitting || !emailConnection.isConnected}
-                    className="bg-accent hover:bg-accent-strong text-background transition-smooth"
+                    className="bg-accent hover:bg-accent-strong text-background transition-smooth px-6"
                   >
                     {isSubmitting ? (
                       <>
@@ -537,6 +480,13 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
         isOpen={showIndexingModal}
         onClose={handleCloseIndexingModal}
         onContinueInBackground={handleContinueInBackground}
+        onCancel={() => {
+          if (createdProjectId) {
+            dismissIndexing(createdProjectId)
+          }
+          setShowIndexingModal(false)
+          onClose()
+        }}
         indexingState={currentIndexingState}
         projectId={createdProjectId || undefined}
       />

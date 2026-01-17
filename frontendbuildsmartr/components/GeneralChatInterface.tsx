@@ -1,48 +1,82 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { Sparkles, Mic, Globe, Mail, Quote, FileText, ChevronDown, X, MessageSquare } from "lucide-react"
+import { X, MessageSquare, FolderPlus, FolderOpen, ArrowRight } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
+import { useUser } from "@/contexts/UserContext"
 import type { SearchMode } from "@/types/project"
-import { SearchInterface } from "./SearchInterface"
-
-interface SearchModeOption {
-  id: SearchMode
-  label: string
-  icon: React.ElementType
-  exclusive?: boolean
-}
-
-const searchModeOptions: SearchModeOption[] = [
-  { id: 'web', label: 'Web Search', icon: Globe },
-  { id: 'email', label: 'Email Search', icon: Mail },
-  { id: 'quotes', label: 'Quotes', icon: Quote },
-  { id: 'pdf', label: 'PDF Search', icon: FileText, exclusive: true },
-]
+import { NewProjectModal } from "./NewProjectModal"
+import { getModeIcon, getModeLabel, isModeExclusive } from "@/lib/constants"
 
 export function GeneralChatInterface() {
   const [query, setQuery] = useState("")
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
+  const { user } = useUser()
   const { 
+    projects,
     generalChats,
     currentGeneralChatId,
     createGeneralChat,
     addMessageToGeneralChat,
     updateGeneralChatTitle,
+    setCurrentProject,
   } = useProjects()
 
   const currentChat = generalChats.find(c => c.id === currentGeneralChatId)
   const messages = currentChat?.messages || []
+
+  // Memoize rendered messages to avoid re-renders on unrelated state changes
+  const renderedMessages = useMemo(() => messages.map((message) => (
+    <div
+      key={message.id}
+      className={`flex animate-fade-in-up ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+    >
+      <div
+        className={`
+          max-w-[80%] px-4 py-3 rounded-2xl
+          ${message.role === 'user'
+            ? 'bg-accent text-background rounded-br-md'
+            : 'bg-[#2b2d31] text-foreground rounded-bl-md'
+          }
+        `}
+      >
+        {/* Show search modes if present */}
+        {message.searchModes && message.searchModes.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {message.searchModes.map(mode => {
+              const Icon = getModeIcon(mode)
+              return (
+                <span
+                  key={mode}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
+                    message.role === 'user' 
+                      ? 'bg-background/20 text-background' 
+                      : 'bg-accent/20 text-accent'
+                  }`}
+                >
+                  <Icon className="w-2.5 h-2.5" />
+                  {getModeLabel(mode)}
+                </span>
+              )
+            })}
+          </div>
+        )}
+        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+      </div>
+    </div>
+  )), [messages])
 
   // Auto-expand textarea based on content
   useEffect(() => {
@@ -53,10 +87,17 @@ export function GeneralChatInterface() {
     }
   }, [query])
 
+  // Smooth scroll to bottom with requestAnimationFrame
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    })
+  }, [])
+
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    scrollToBottom()
+  }, [messages, scrollToBottom])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -70,9 +111,7 @@ export function GeneralChatInterface() {
   }, [])
 
   const handleModeToggle = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    
-    if (option?.exclusive) {
+    if (isModeExclusive(mode)) {
       if (selectedModes.includes(mode)) {
         setSelectedModes([])
       } else {
@@ -93,22 +132,14 @@ export function GeneralChatInterface() {
     setSelectedModes(prev => prev.filter(m => m !== mode))
   }
 
-  const getModeIcon = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.icon || Globe
-  }
-
-  const getModeLabel = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.label || mode
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim() || isSubmitting) return
 
-    setIsSubmitting(true)
+    // Capture query and clear input IMMEDIATELY for snappy feel
     const currentQuery = query.trim()
+    setQuery("")
+    setIsSubmitting(true)
     
     try {
       let chatId = currentGeneralChatId
@@ -123,18 +154,20 @@ export function GeneralChatInterface() {
         searchModes: selectedModes.length > 0 ? selectedModes : undefined,
       }
 
-      await addMessageToGeneralChat(chatId, userMessage)
+      // Add message optimistically (no await - updates UI immediately)
+      addMessageToGeneralChat(chatId, userMessage)
 
-      // Update chat title if it's the first message
+      // Update chat title in background (fire-and-forget)
       const chat = generalChats.find(c => c.id === chatId)
       if (chat && chat.messages.length === 0) {
-        await updateGeneralChatTitle(chatId, currentQuery.slice(0, 50))
+        updateGeneralChatTitle(chatId, currentQuery.slice(0, 50))
       }
 
-      setQuery("")
+      // Unlock input faster
+      setIsSubmitting(false)
 
       // Simulate AI response
-      setTimeout(async () => {
+      setTimeout(() => {
         const modesText = selectedModes.length > 0 
           ? `Using ${selectedModes.join(', ')} mode(s), ` 
           : ''
@@ -142,48 +175,140 @@ export function GeneralChatInterface() {
           role: 'assistant' as const,
           content: `${modesText}I understand you're asking about "${currentQuery}". How can I help you further?`,
         }
-        await addMessageToGeneralChat(chatId!, assistantMessage)
+        addMessageToGeneralChat(chatId!, assistantMessage)
       }, 1000)
-    } finally {
+    } catch {
       setIsSubmitting(false)
     }
   }
 
-  // If no current chat, show the welcome screen with SearchInterface
+  const handleProjectClick = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      setCurrentProject(project)
+      router.push(`/project/${projectId}`)
+    }
+  }
+
+  // Project-focused welcome screen (no general chat for demo)
   if (!currentChat) {
     return (
-      <motion.main 
-        className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        style={{
-          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)',
-        }}
-      >
-        {/* Logo */}
-        <motion.div 
-          className="mb-8 md:mb-12"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.5 }}
+      <>
+        <NewProjectModal
+          isOpen={isNewProjectModalOpen}
+          onClose={() => setIsNewProjectModalOpen(false)}
+        />
+        <motion.main 
+          className="min-h-screen flex flex-col px-4 py-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          style={{
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 60px)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)',
+          }}
         >
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-            <span className="text-foreground">IIvy</span>
-          </h1>
-        </motion.div>
+          <div className="w-full max-w-4xl mx-auto">
+            {/* Header */}
+            <motion.div 
+              className="mb-8"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+            >
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
+                <span className="text-foreground">Welcome{user.firstName ? `, ${user.firstName}` : ''}</span>
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Manage your construction projects with AI-powered insights
+              </p>
+            </motion.div>
 
-        {/* Search Interface */}
-        <motion.div
-          className="w-full"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
-          <SearchInterface />
-        </motion.div>
-      </motion.main>
+            {/* New Project CTA - Prominent */}
+            {projects.length === 0 ? (
+              <motion.div
+                className="mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+              >
+                <div className="bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 rounded-2xl p-8 text-center">
+                  <div className="w-16 h-16 bg-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <FolderPlus className="w-8 h-8 text-accent" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">Create your first project</h2>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Upload your construction documents, connect your email, and let IIvy help you find answers instantly.
+                  </p>
+                  <Button
+                    onClick={() => setIsNewProjectModalOpen(true)}
+                    className="bg-accent hover:bg-accent-strong text-background px-6 py-2 rounded-lg font-medium"
+                  >
+                    <FolderPlus className="w-4 h-4 mr-2" />
+                    New Project
+                  </Button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                className="mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+              >
+                <Button
+                  onClick={() => setIsNewProjectModalOpen(true)}
+                  className="bg-accent hover:bg-accent-strong text-background px-5 py-2.5 rounded-lg font-medium"
+                >
+                  <FolderPlus className="w-4 h-4 mr-2" />
+                  New Project
+                </Button>
+              </motion.div>
+            )}
+
+            {/* Projects Grid */}
+            {projects.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-foreground">Your Projects</h2>
+                  <span className="text-sm text-muted-foreground">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projects.map((project, index) => (
+                    <motion.button
+                      key={project.id}
+                      onClick={() => handleProjectClick(project.id)}
+                      className="flex flex-col p-5 bg-surface border border-border rounded-xl hover:border-accent/50 hover:shadow-lg transition-all text-left group"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + index * 0.05, duration: 0.4 }}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="p-2.5 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
+                          <FolderOpen className="w-5 h-5 text-accent" />
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-accent transition-all" />
+                      </div>
+                      <h3 className="font-semibold text-foreground mb-1 line-clamp-1">{project.name}</h3>
+                      {project.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{project.description}</p>
+                      )}
+                      <div className="mt-auto pt-3 border-t border-border/50 flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>{project.files.length} file{project.files.length !== 1 ? 's' : ''}</span>
+                        <span>{project.chats.length} chat{project.chats.length !== 1 ? 's' : ''}</span>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </motion.main>
+      </>
     )
   }
 
@@ -212,47 +337,8 @@ export function GeneralChatInterface() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto scroll-smooth-ios">
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-          {messages.map((message) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`
-                  max-w-[80%] px-4 py-3 rounded-2xl
-                  ${message.role === 'user'
-                    ? 'bg-accent text-background rounded-br-md'
-                    : 'bg-[#2b2d31] text-foreground rounded-bl-md'
-                  }
-                `}
-              >
-                {/* Show search modes if present */}
-                {message.searchModes && message.searchModes.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {message.searchModes.map(mode => {
-                      const Icon = getModeIcon(mode)
-                      return (
-                        <span
-                          key={mode}
-                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
-                            message.role === 'user' 
-                              ? 'bg-background/20 text-background' 
-                              : 'bg-accent/20 text-accent'
-                          }`}
-                        >
-                          <Icon className="w-2.5 h-2.5" />
-                          {getModeLabel(mode)}
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              </div>
-            </motion.div>
-          ))}
+          {/* Use memoized messages for better performance */}
+          {renderedMessages}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -314,7 +400,7 @@ export function GeneralChatInterface() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault()
-                      handleSubmit(e)
+                      e.currentTarget.closest('form')?.requestSubmit()
                     }
                   }}
                 />
@@ -325,23 +411,18 @@ export function GeneralChatInterface() {
                   <div className="relative" ref={dropdownRef}> ... </div>
                   <motion.button ... > <Mic className="size-4" /> </motion.button>
                   */}
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!query.trim() || isSubmitting}
+                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 btn-interactive"
+                    aria-label="Send"
                   >
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={!query.trim() || isSubmitting}
-                      className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
-                      aria-label="Send"
-                    >
-                      {/* Use send icon with bluish accent */}
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
-                      </svg>
-                    </Button>
-                  </motion.div>
+                    {/* Use send icon with bluish accent */}
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                    </svg>
+                  </Button>
                 </div>
               </div>
             </div>

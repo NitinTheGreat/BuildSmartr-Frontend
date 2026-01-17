@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2 } from "lucide-react"
+import { User, LogOut, Menu, X, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
@@ -10,16 +10,13 @@ import Image from "next/image"
 import logo from "@/public/logo.png"
 import { useProjects } from "@/contexts/ProjectContext"
 import { useIndexing } from "@/contexts/IndexingContext"
+import { useUser } from "@/contexts/UserContext"
 import { NewProjectModal } from "./NewProjectModal"
 
-type SidebarProps = {
-  initialAvatarUrl?: string | null
-  initialFirstName?: string | null
-}
-
-export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: SidebarProps) {
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl)
-  const [firstName, setFirstName] = useState<string | null>(initialFirstName)
+export function Sidebar() {
+  const { user } = useUser()
+  const avatarUrl = user.avatarUrl
+  const firstName = user.firstName
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -33,30 +30,8 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.refresh()
+    router.push('/') // Redirect to sign-in page
   }
-
-  useEffect(() => {
-    const supabase = createClient()
-
-    supabase.auth.getUser().then(({ data }) => {
-      const meta = data.user?.user_metadata
-      const url = (meta?.avatar_url ?? meta?.picture) as string | undefined
-      const name = (meta?.full_name ?? meta?.name) as string | undefined
-      setAvatarUrl(url ?? null)
-      setFirstName(name?.split(" ")[0] ?? null)
-    })
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const meta = session?.user?.user_metadata
-      const url = (meta?.avatar_url ?? meta?.picture) as string | undefined
-      const name = (meta?.full_name ?? meta?.name) as string | undefined
-      setAvatarUrl(url ?? null)
-      setFirstName(name?.split(" ")[0] ?? null)
-    })
-
-    return () => listener.subscription.unsubscribe()
-  }, [])
 
   const closeMobileMenu = () => setIsMobileOpen(false)
 

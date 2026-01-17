@@ -1,33 +1,20 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
-import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip } from "lucide-react"
-import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile } from "@/types/project"
+import { FileEdit, FolderOpen, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Mail, Eye, Paperclip } from "lucide-react"
+import type { Project, SearchMode, ProjectFile } from "@/types/project"
 import { EditFilesModal } from "./EditFilesModal"
 import { ShareProjectModal } from "./ShareProjectModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
 import { useProjects } from "@/contexts/ProjectContext"
 import { useIndexing } from "@/contexts/IndexingContext"
 import { useStreamingSearch } from "@/hooks/useStreamingSearch"
-
-interface SearchModeOption {
-  id: SearchMode
-  label: string
-  icon: React.ElementType
-  exclusive?: boolean
-}
-
-const searchModeOptions: SearchModeOption[] = [
-  { id: 'web', label: 'Web Search', icon: Globe },
-  { id: 'email', label: 'Email Search', icon: Mail },
-  { id: 'quotes', label: 'Quotes', icon: Quote },
-  { id: 'pdf', label: 'PDF Search', icon: FileText, exclusive: true },
-]
+import { getModeIcon, getModeLabel, isModeExclusive } from "@/lib/constants"
 
 interface ProjectChatInterfaceProps {
   project: Project
@@ -45,6 +32,9 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingChat, setIsLoadingChat] = useState(false)
+  const [isCreatingChat, setIsCreatingChat] = useState(false)
+  const [loadingChatId, setLoadingChatId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -81,6 +71,50 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const messages = currentChat?.messages || []
   const isInChatView = !!currentChat
 
+  // Memoize rendered messages to avoid re-renders on unrelated state changes
+  const renderedMessages = useMemo(() => messages.map((message) => (
+    <div
+      key={message.id}
+      className={`flex animate-fade-in-up ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+    >
+      <div
+        className={`
+          max-w-[80%] px-4 py-3 rounded-2xl
+          ${message.role === 'user'
+            ? 'bg-accent text-background rounded-br-md'
+            : 'bg-[#2b2d31] text-foreground rounded-bl-md'
+          }
+        `}
+      >
+        {/* Show search modes if present */}
+        {message.searchModes && message.searchModes.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {message.searchModes.map(mode => {
+              const Icon = getModeIcon(mode)
+              return (
+                <span
+                  key={mode}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${message.role === 'user'
+                    ? 'bg-background/20 text-background'
+                    : 'bg-accent/20 text-accent'
+                    }`}
+                >
+                  <Icon className="w-2.5 h-2.5" />
+                  {getModeLabel(mode)}
+                </span>
+              )
+            })}
+          </div>
+        )}
+        {message.role === 'assistant' ? (
+          <MarkdownRenderer content={message.content} />
+        ) : (
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        )}
+      </div>
+    </div>
+  )), [messages])
+
   // Auto-expand textarea based on content
   useEffect(() => {
     const textarea = textareaRef.current
@@ -90,10 +124,35 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     }
   }, [query])
 
+  // Smooth scroll to bottom with requestAnimationFrame
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    })
+  }, [])
+
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
+  // Load chat messages when currentChatId changes (e.g., from sidebar navigation)
+  useEffect(() => {
+    if (currentChatId && project.id) {
+      const chat = project.chats.find(c => c.id === currentChatId)
+      // Only load if we don't already have messages loaded
+      if (chat && chat.messages.length === 0) {
+        setIsLoadingChat(true)
+        loadChatMessages(project.id, currentChatId).finally(() => {
+          setIsLoadingChat(false)
+          setLoadingChatId(null)
+        })
+      } else {
+        // Messages already loaded, clear loading state immediately
+        setLoadingChatId(null)
+      }
+    }
+  }, [currentChatId, project.id, project.chats, loadChatMessages])
 
   // Focus name input when editing
   useEffect(() => {
@@ -129,9 +188,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   }, [])
 
   const handleModeToggle = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-
-    if (option?.exclusive) {
+    if (isModeExclusive(mode)) {
       if (selectedModes.includes(mode)) {
         setSelectedModes([])
       } else {
@@ -150,16 +207,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
   const removeMode = (mode: SearchMode) => {
     setSelectedModes(prev => prev.filter(m => m !== mode))
-  }
-
-  const getModeIcon = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.icon || Globe
-  }
-
-  const getModeLabel = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.label || mode
   }
 
   const handleSaveName = () => {
@@ -187,13 +234,19 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   }
 
   const handleNewChat = async () => {
-    await createChat(project.id)
+    setIsCreatingChat(true)
+    try {
+      await createChat(project.id)
+    } finally {
+      setIsCreatingChat(false)
+    }
   }
 
-  const handleSelectChat = async (chatId: string) => {
+  const handleSelectChat = (chatId: string) => {
+    // Show immediate visual feedback
+    setLoadingChatId(chatId)
+    // Set the ID - useEffect will handle loading messages if needed
     setCurrentChatId(chatId)
-    // Load messages for the selected chat
-    await loadChatMessages(project.id, chatId)
   }
 
   const handleBackToProject = () => {
@@ -209,36 +262,41 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     e.preventDefault()
     if (!query.trim() || isSubmitting || isStreaming) return
 
+    // Capture query and clear input IMMEDIATELY for snappy feel
+    const currentQuery = query.trim()
+    setQuery("")
     setIsSubmitting(true)
     resetStreaming()
 
     try {
-      // If no current chat, create one
+      // If no current chat, create one (this must be awaited)
       let chatId = currentChatId
       if (!chatId) {
-        const newChat = await createChat(project.id, query.trim().slice(0, 50))
+        setIsCreatingChat(true)
+        const newChat = await createChat(project.id, currentQuery.slice(0, 50))
         chatId = newChat.id
+        setIsCreatingChat(false)
       }
 
       const userMessage = {
         role: 'user' as const,
-        content: query.trim(),
+        content: currentQuery,
         searchModes: selectedModes.length > 0 ? selectedModes : undefined,
       }
 
-      await addMessageToChat(project.id, chatId, userMessage)
+      // Add message optimistically (no await needed - it updates UI immediately)
+      addMessageToChat(project.id, chatId, userMessage)
 
-      // Update chat title if it's the first message
+      // Update chat title in background (fire-and-forget, don't await)
       const chat = project.chats.find(c => c.id === chatId)
       if (chat && chat.messages.length === 0) {
-        await updateChatTitle(project.id, chatId, query.trim().slice(0, 50))
+        updateChatTitle(project.id, chatId, currentQuery.slice(0, 50))
       }
 
-      const currentQuery = query.trim()
-      setQuery("")
+      // Unlock input faster - streaming will show its own loading state
       setIsSubmitting(false)
 
-      // Use streaming search API
+      // Start streaming search immediately
       try {
         const aiResponse = await streamSearch(project.name, currentQuery)
 
@@ -248,23 +306,22 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
             role: 'assistant' as const,
             content: aiResponse,
           }
-          await addMessageToChat(project.id, chatId!, assistantMessage)
-          // Reset streaming state so the bubble disappears
+          addMessageToChat(project.id, chatId!, assistantMessage)
           resetStreaming()
         }
       } catch (streamError) {
         console.error('Streaming search error:', streamError)
-        // Add error message as assistant response
         const errorMessage = {
           role: 'assistant' as const,
           content: `Sorry, I encountered an error while searching: ${streamError instanceof Error ? streamError.message : 'Unknown error'}. Please try again.`,
         }
-        await addMessageToChat(project.id, chatId!, errorMessage)
+        addMessageToChat(project.id, chatId!, errorMessage)
         resetStreaming()
       }
     } catch (error) {
       console.error('Failed to submit message:', error)
       setIsSubmitting(false)
+      setIsCreatingChat(false)
     }
   }
 
@@ -347,98 +404,68 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`
-                      max-w-[80%] px-4 py-3 rounded-2xl
-                      ${message.role === 'user'
-                        ? 'bg-accent text-background rounded-br-md'
-                        : 'bg-[#2b2d31] text-foreground rounded-bl-md'
-                      }
-                    `}
-                  >
-                    {/* Show search modes if present */}
-                    {message.searchModes && message.searchModes.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {message.searchModes.map(mode => {
-                          const Icon = getModeIcon(mode)
-                          return (
-                            <span
-                              key={mode}
-                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${message.role === 'user'
-                                ? 'bg-background/20 text-background'
-                                : 'bg-accent/20 text-accent'
-                                }`}
-                            >
-                              <Icon className="w-2.5 h-2.5" />
-                              {getModeLabel(mode)}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )}
-                    {message.role === 'assistant' ? (
-                      <MarkdownRenderer content={message.content} />
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    )}
+              {/* Loading skeleton when fetching chat messages */}
+              {isLoadingChat ? (
+                <div className="space-y-4 animate-pulse">
+                  <div className="flex justify-end">
+                    <div className="w-2/3 h-12 bg-accent/20 rounded-2xl rounded-br-md" />
                   </div>
-                </motion.div>
-              ))}
+                  <div className="flex justify-start">
+                    <div className="w-3/4 h-24 bg-[#2b2d31] rounded-2xl rounded-bl-md" />
+                  </div>
+                  <div className="flex justify-end">
+                    <div className="w-1/2 h-10 bg-accent/20 rounded-2xl rounded-br-md" />
+                  </div>
+                  <div className="flex justify-start">
+                    <div className="w-4/5 h-32 bg-[#2b2d31] rounded-2xl rounded-bl-md" />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Use memoized messages for better performance */}
+                  {renderedMessages}
 
-              {/* Streaming message bubble */}
-              {(isStreaming || streamedContent) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-start"
-                >
-                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-[#2b2d31] text-foreground rounded-bl-md">
-                    {/* Thinking status */}
-                    {thinkingStatus && !streamedContent && (
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <Spinner size="sm" variant="dots" />
-                        <span>{thinkingStatus}</span>
-                      </div>
-                    )}
+                  {/* Streaming message bubble */}
+                  {(isStreaming || streamedContent) && (
+                    <div className="flex justify-start animate-fade-in-up">
+                      <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-[#2b2d31] text-foreground rounded-bl-md">
+                        {/* Thinking status */}
+                        {thinkingStatus && !streamedContent && (
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <Spinner size="sm" variant="dots" />
+                            <span>{thinkingStatus}</span>
+                          </div>
+                        )}
 
-                    {/* Streamed content */}
-                    {streamedContent && (
-                      <div>
-                        <MarkdownRenderer content={streamedContent} />
-                        {isStreaming && (
-                          <span className="inline-block w-2 h-4 ml-1 bg-accent animate-pulse" />
+                        {/* Streamed content */}
+                        {streamedContent && (
+                          <div>
+                            <MarkdownRenderer content={streamedContent} />
+                            {isStreaming && (
+                              <span className="inline-block w-2 h-4 ml-1 bg-accent animate-pulse" />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Stats after completion */}
+                        {streamingStats && !isStreaming && (
+                          <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                            Search: {streamingStats.searchTimeMs}ms • LLM: {streamingStats.llmTimeMs}ms
+                          </div>
                         )}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Stats after completion */}
-                    {streamingStats && !isStreaming && (
-                      <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-                        Search: {streamingStats.searchTimeMs}ms • LLM: {streamingStats.llmTimeMs}ms
+                  {/* Streaming error */}
+                  {streamingError && (
+                    <div className="flex justify-start animate-fade-in-up">
+                      <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 rounded-bl-md">
+                        <p className="text-sm">⚠️ {streamingError}</p>
                       </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Streaming error */}
-              {streamingError && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-start"
-                >
-                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 rounded-bl-md">
-                    <p className="text-sm">⚠️ {streamingError}</p>
-                  </div>
-                </motion.div>
+                    </div>
+                  )}
+                </>
               )}
 
               <div ref={messagesEndRef} />
@@ -496,7 +523,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault()
-                          handleSubmit(e)
+                          e.currentTarget.closest('form')?.requestSubmit()
                         }
                       }}
                     />
@@ -594,23 +621,18 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                         </Button>
                       </motion.div>
                       */}
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                      <Button
+                        type="submit"
+                        size="icon"
+                        disabled={!query.trim() || isStreaming}
+                        className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-8 w-8 btn-interactive"
+                        aria-label="Send"
                       >
-                        <Button
-                          type="submit"
-                          size="icon"
-                          disabled={!query.trim() || isStreaming}
-                          className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-8 w-8"
-                          aria-label="Send"
-                        >
-                          {/* Use send icon with bluish accent */}
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
-                          </svg>
-                        </Button>
-                      </motion.div>
+                        {/* Use send icon with bluish accent */}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                        </svg>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -843,10 +865,20 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               variant="outline"
               size="sm"
               onClick={handleNewChat}
+              disabled={isCreatingChat}
               className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
             >
-              <Plus className="w-4 h-4" />
-              New Chat
+              {isCreatingChat ? (
+                <>
+                  <Spinner size="sm" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  New Chat
+                </>
+              )}
             </Button>
           </div>
 
@@ -856,10 +888,15 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 <div
                   key={chat.id}
                   onClick={() => handleSelectChat(chat.id)}
-                  className="flex items-center justify-between p-3 bg-[#2b2d31] border border-border rounded-lg cursor-pointer hover:bg-[#3c3f45] transition-colors group"
+                  className={`flex items-center justify-between p-3 bg-[#2b2d31] border border-border rounded-lg cursor-pointer hover:bg-[#3c3f45] transition-colors group ${loadingChatId === chat.id ? 'ring-2 ring-accent/50 bg-[#3c3f45]' : ''
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <MessageSquare className="w-5 h-5 text-accent" />
+                    {loadingChatId === chat.id ? (
+                      <Spinner size="sm" className="text-accent" />
+                    ) : (
+                      <MessageSquare className="w-5 h-5 text-accent" />
+                    )}
                     <div>
                       <p className="text-sm font-medium text-foreground">{chat.title}</p>
                       <p className="text-xs text-muted-foreground">
@@ -881,6 +918,13 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
         {/* Search/Chat Input */}
         <div className="w-full max-w-2xl">
+          {/* Creating chat indicator */}
+          {isCreatingChat && (
+            <div className="flex items-center justify-center gap-2 mb-3 text-sm text-accent animate-fade-in-up">
+              <Spinner size="sm" />
+              <span>Starting new chat...</span>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="relative">
             <div className="relative bg-surface rounded-xl border border-border shadow-sm hover:border-muted transition-colors overflow-visible">
               <div className="flex items-start gap-3 p-4">
@@ -904,23 +948,18 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                   // Mic and other icons commented out for now
                   <motion.button ... > <Mic className="size-5" /> </motion.button>
                   */}
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!query.trim() || isStreaming}
+                    className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 btn-interactive"
+                    aria-label="Send"
                   >
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={!query.trim() || isStreaming}
-                      className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50"
-                      aria-label="Send"
-                    >
-                      {/* Use send icon with bluish accent */}
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
-                      </svg>
-                    </Button>
-                  </motion.div>
+                    {/* Use send icon with bluish accent */}
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                    </svg>
+                  </Button>
                 </div>
               </div>
             </div>

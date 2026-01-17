@@ -4,8 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
 import { ProjectChatInterface } from "@/components/ProjectChatInterface"
-import { Spinner } from "@/components/ui/spinner"
-import { motion } from "framer-motion"
+import { PageSkeleton } from "@/components/Skeleton"
 
 export default function ProjectPage() {
   const params = useParams()
@@ -25,9 +24,20 @@ export default function ProjectPage() {
       if (projects.length === 0) return
       
       hasLoadedRef.current = true
-      setIsLoading(true)
       
-      // Load full project details (including files and chats)
+      // Check if we have cached data with files/chats already loaded
+      const cached = projects.find(p => p.id === projectId)
+      if (cached && cached.files && cached.files.length > 0) {
+        // Use cached data immediately for instant display
+        setCurrentProject(cached)
+        setIsLoading(false)
+        // Refresh in background (non-blocking) to get latest data
+        loadProject(projectId)
+        return
+      }
+      
+      // No cached data, need to fetch
+      setIsLoading(true)
       const fullProject = await loadProject(projectId)
       
       if (fullProject) {
@@ -46,35 +56,12 @@ export default function ProjectPage() {
 
   // Show loading state
   if (isLoading || !currentProject || currentProject.id !== projectId) {
-    return (
-      <motion.div 
-        className="min-h-screen flex items-center justify-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className="flex flex-col items-center gap-4">
-          <Spinner size="lg" variant="dots" />
-          <motion.p 
-            className="text-muted-foreground text-sm"
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            Loading project...
-          </motion.p>
-        </div>
-      </motion.div>
-    )
+    return <PageSkeleton />
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
+    <div className="animate-fade-in">
       <ProjectChatInterface project={currentProject} />
-    </motion.div>
+    </div>
   )
 }

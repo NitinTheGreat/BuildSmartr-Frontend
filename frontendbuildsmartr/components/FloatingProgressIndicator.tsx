@@ -204,25 +204,42 @@ export function FloatingProgressIndicator() {
                     )}
                 </AnimatePresence>
 
-                {/* Actions for completed/error */}
-                {(isCompleted || isError) && (
-                    <div className="p-3 border-t border-border/50 flex gap-2">
-                        <button
-                            onClick={() => dismissIndexing(primaryState.projectId)}
-                            className="flex-1 text-xs py-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            Dismiss
-                        </button>
-                        {isCompleted && (
+                {/* Actions */}
+                <div className="p-3 border-t border-border/50 flex gap-2">
+                    {isIndexing ? (
+                        <>
+                            <button
+                                onClick={() => dismissIndexing(primaryState.projectId)}
+                                className="flex-1 text-xs py-1.5 text-red-400 hover:text-red-300 border border-red-500/30 rounded hover:bg-red-500/10 transition-colors"
+                            >
+                                Stop Processing
+                            </button>
                             <button
                                 onClick={() => router.push(`/project/${primaryState.projectId}`)}
                                 className="flex-1 text-xs py-1.5 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors font-medium"
                             >
-                                Open Project
+                                View Project
                             </button>
-                        )}
-                    </div>
-                )}
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => dismissIndexing(primaryState.projectId)}
+                                className="flex-1 text-xs py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                Dismiss
+                            </button>
+                            {isCompleted && (
+                                <button
+                                    onClick={() => router.push(`/project/${primaryState.projectId}`)}
+                                    className="flex-1 text-xs py-1.5 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors font-medium"
+                                >
+                                    Open Project
+                                </button>
+                            )}
+                        </>
+                    )}
+                </div>
             </div>
         </motion.div>
     )
