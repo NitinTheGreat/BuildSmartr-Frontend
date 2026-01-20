@@ -74,6 +74,12 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
         let fullContent = ''
 
         try {
+            console.log('🔍 [useStreamingSearch] Sending search request:')
+            console.log('   project_id:', projectId)
+            console.log('   question:', question)
+            console.log('   top_k:', topK)
+            console.log('   backend URL:', `${AI_BACKEND_URL}/api/search_project_stream`)
+
             const response = await fetch(`${AI_BACKEND_URL}/api/search_project_stream`, {
                 method: 'POST',
                 headers: {

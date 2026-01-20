@@ -241,7 +241,41 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
       // Use streaming search API
       try {
         // Get the backend project_id from indexing state for search
-        const backendProjectId = projectIndexingState?.backendProjectId
+        let backendProjectId = projectIndexingState?.backendProjectId
+
+        // Debug logging
+        console.log('🔍 [ProjectChatInterface] Chat search initiated')
+        console.log('   project.id:', project.id)
+        console.log('   project.name:', project.name)
+        console.log('   backendProjectId from indexing state:', backendProjectId)
+
+        // If backendProjectId is not available in indexing state, generate it deterministically
+        if (!backendProjectId) {
+          console.log('   ⚠️ No backendProjectId in indexing state, generating via API...')
+          try {
+            // Use generate_project_id endpoint - deterministic: same project_name + user_email = same project_id
+            const response = await fetch('/api/projects/generate-id', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project_name: project.name })
+            })
+            console.log('   📡 /api/projects/generate-id response status:', response.status)
+            if (response.ok) {
+              const data = await response.json()
+              console.log('   📦 Generated project data:', data)
+              if (data.project_id) {
+                backendProjectId = data.project_id
+                console.log('   ✅ Got backendProjectId:', backendProjectId)
+              }
+            } else {
+              const errorData = await response.json().catch(() => ({}))
+              console.log('   ❌ API error:', errorData)
+            }
+          } catch (fetchError) {
+            console.error('   ❌ Failed to generate project ID:', fetchError)
+          }
+        }
+
         if (!backendProjectId) {
           console.error('[ProjectChatInterface] No backendProjectId - project may not be indexed yet')
           const errorMessage = {
@@ -252,6 +286,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           return
         }
 
+        console.log('   🚀 Sending search with project_id:', backendProjectId)
         const aiResponse = await streamSearch(backendProjectId, currentQuery)
 
         // Save the final response as assistant message

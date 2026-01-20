@@ -39,7 +39,20 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
                         if (now - state.startedAt > ONE_HOUR) {
                             relevantStates[id] = { ...state, status: 'error', error: 'Indexing timed out' }
                         } else {
-                            relevantStates[id] = state
+                            // Fetch project name from backend if missing
+                            let projectName = state.projectName
+                            if (!projectName && state.backendProjectId) {
+                                try {
+                                    const response = await fetch(`/api/projects/details?project_id=${encodeURIComponent(state.backendProjectId)}`)
+                                    if (response.ok) {
+                                        const data = await response.json()
+                                        projectName = data.project_name || state.projectName
+                                    }
+                                } catch {
+                                    // Use existing if fetch fails
+                                }
+                            }
+                            relevantStates[id] = { ...state, projectName: projectName || 'Unknown Project' }
                             if (state.backendProjectId) {
                                 setTimeout(() => startPolling(id, state.backendProjectId!), 500)
                             }

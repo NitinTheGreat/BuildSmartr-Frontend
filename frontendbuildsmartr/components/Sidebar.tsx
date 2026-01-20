@@ -27,7 +27,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
   const pathname = usePathname()
-  const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat } = useProjects()
+  const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat, isLoading } = useProjects()
   const { indexingStates } = useIndexing()
 
   const handleLogout = async () => {
@@ -220,6 +220,29 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
         {/* Scrollable content area for projects and chats */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3">
+          {/* Loading Skeletons */}
+          {isLoading && projects.length === 0 && (
+            <div className="space-y-1">
+              {isExpandedView && (
+                <span className="text-[10px] uppercase text-muted-foreground px-1 mb-2 block">Projects</span>
+              )}
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className={`flex items-center ${isExpandedView ? 'gap-2 px-3' : 'justify-center'} py-2 rounded-lg`}
+                >
+                  {/* Animated skeleton loader */}
+                  <div className="w-4 h-4 rounded bg-muted/50 animate-pulse flex-shrink-0" />
+                  {isExpandedView && (
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3 bg-muted/50 rounded animate-pulse" style={{ width: `${60 + i * 10}%` }} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Projects List */}
           {projects.filter(p => searchQuery === '' || p.name.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
             <div className="space-y-1">
