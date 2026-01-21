@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 import type { Project, ProjectFile, ProjectChat, ChatMessage, GeneralChat } from "@/types/project"
-import type { 
+import type {
   ProjectResponse,
   ChatResponse,
   MessageResponse,
@@ -10,38 +10,73 @@ import type {
 } from "@/types/api"
 import { createClient } from "@/utils/supabase/client"
 import { OfflineModal } from "@/components/OfflineModal"
+import { apiCache, cachedFetch, deduplicatedFetch, CacheTTL, CacheKeys } from "@/utils/cache"
 
 // ============================================
-// Fetch Helper
+// Fetch Helper with Caching
 // ============================================
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  try {
-    const response = await fetch(`/api${endpoint}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-      ...options,
-    })
+interface FetchOptions extends Omit<RequestInit, 'cache'> {
+  useCache?: boolean
+  cacheTTL?: number
+  forceRefresh?: boolean
+}
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "Request failed" }))
-      // Check for backend unavailable error
-      if (response.status === 503 || error.error === "Backend unavailable") {
+async function fetchApi<T>(endpoint: string, options?: FetchOptions): Promise<T> {
+  const isGet = !options?.method || options.method === 'GET'
+  const shouldCache = isGet && options?.useCache !== false
+
+  const doFetch = async (): Promise<T> => {
+    try {
+      const response = await fetch(`/api${endpoint}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+        },
+        ...options,
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Request failed" }))
+        if (response.status === 503 || error.error === "Backend unavailable") {
+          throw new Error("__CONNECTION_ERROR__")
+        }
+        throw new Error(error.error || response.statusText)
+      }
+
+      return response.json()
+    } catch (err) {
+      if (err instanceof TypeError && err.message.includes('fetch')) {
         throw new Error("__CONNECTION_ERROR__")
       }
-      throw new Error(error.error || response.statusText)
+      throw err
     }
-
-    return response.json()
-  } catch (err) {
-    // Network error (offline, DNS failure, etc.)
-    if (err instanceof TypeError && err.message.includes('fetch')) {
-      throw new Error("__CONNECTION_ERROR__")
-    }
-    throw err
   }
+
+  // For GET requests, use caching and deduplication
+  if (shouldCache) {
+    return cachedFetch<T>(
+      endpoint,
+      () => deduplicatedFetch(endpoint, doFetch),
+      {
+        ttl: options?.cacheTTL ?? CacheTTL.SHORT,
+        forceRefresh: options?.forceRefresh
+      }
+    )
+  }
+
+  // For mutations, invalidate related caches
+  if (!isGet) {
+    // Invalidate caches based on endpoint patterns
+    if (endpoint.includes('/projects')) {
+      apiCache.invalidatePattern(/\/projects/)
+    }
+    if (endpoint.includes('/chats')) {
+      apiCache.invalidatePattern(/\/chats/)
+    }
+  }
+
+  return doFetch()
 }
 
 // ============================================
@@ -178,11 +213,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = createClient()
     let isMounted = true
-    
+
     const loadData = async () => {
       // Prevent duplicate loads
       if (hasLoadedInitialData) return
-      
+
       const { data: { session } } = await supabase.auth.getSession()
       if (session && isMounted) {
         setHasLoadedInitialData(true)
@@ -190,12 +225,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         loadGeneralChats()
       }
     }
-    
+
     loadData()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return
-      
+
       if (session && event === 'SIGNED_IN' && !hasLoadedInitialData) {
         setHasLoadedInitialData(true)
         loadProjects()
@@ -216,7 +251,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       isMounted = false
       subscription.unsubscribe()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ============================================
@@ -241,10 +276,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setError(null)
       const data = await fetchApi<ProjectResponse>(`/projects/${projectId}`)
       const project = toProject(data)
-      
+
       // Update the project in the list
       setProjects(prev => prev.map(p => p.id === projectId ? project : p))
-      
+
       return project
     } catch (err) {
       handleError(err, "Failed to load project")
@@ -253,15 +288,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [handleError])
 
   const createProject = useCallback(async (
-    name: string, 
-    description: string, 
-    companyAddress: string, 
-    tags: string[], 
+    name: string,
+    description: string,
+    companyAddress: string,
+    tags: string[],
     files: File[]
   ): Promise<Project> => {
     try {
       setError(null)
-      
+
       const data = await fetchApi<ProjectResponse>("/projects", {
         method: "POST",
         body: JSON.stringify({
@@ -271,9 +306,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           tags,
         }),
       })
-      
+
       const newProject = toProject(data)
-      
+
       // Upload files if any
       if (files.length > 0) {
         const uploadedFiles: ProjectFile[] = []
@@ -282,12 +317,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
             const formData = new FormData()
             formData.append("file", file)
             formData.append("category", "other")
-            
+
             const response = await fetch(`/api/projects/${newProject.id}/files`, {
               method: "POST",
               body: formData,
             })
-            
+
             if (response.ok) {
               const fileData = await response.json()
               uploadedFiles.push(toProjectFile(fileData))
@@ -298,7 +333,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         }
         newProject.files = uploadedFiles
       }
-      
+
       setProjects(prev => [newProject, ...prev])
       return newProject
     } catch (err) {
@@ -309,7 +344,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateProject = useCallback(async (
-    id: string, 
+    id: string,
     updates: Partial<Pick<Project, 'name' | 'description' | 'companyAddress' | 'tags'>>
   ) => {
     try {
@@ -323,11 +358,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           tags: updates.tags,
         }),
       })
-      
-      setProjects(prev => prev.map(p => 
+
+      setProjects(prev => prev.map(p =>
         p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
       ))
-      
+
       if (currentProject?.id === id) {
         setCurrentProject(prev => prev ? { ...prev, ...updates, updatedAt: new Date() } : null)
       }
@@ -342,9 +377,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     try {
       setError(null)
       await fetchApi(`/projects/${id}`, { method: "DELETE" })
-      
+
       setProjects(prev => prev.filter(p => p.id !== id))
-      
+
       if (currentProject?.id === id) {
         setCurrentProject(null)
         setCurrentChatId(null)
@@ -364,33 +399,33 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     try {
       setError(null)
       const uploadedFiles: ProjectFile[] = []
-      
+
       for (const file of files) {
         const formData = new FormData()
         formData.append("file", file)
         formData.append("category", category)
-        
+
         const response = await fetch(`/api/projects/${projectId}/files`, {
           method: "POST",
           body: formData,
         })
-        
+
         if (!response.ok) {
           throw new Error("Upload failed")
         }
-        
+
         const data = await response.json()
         uploadedFiles.push(toProjectFile(data))
       }
-      
-      setProjects(prev => prev.map(p => 
-        p.id === projectId 
+
+      setProjects(prev => prev.map(p =>
+        p.id === projectId
           ? { ...p, files: [...p.files, ...uploadedFiles], updatedAt: new Date() }
           : p
       ))
-      
+
       if (currentProject?.id === projectId) {
-        setCurrentProject(prev => prev 
+        setCurrentProject(prev => prev
           ? { ...prev, files: [...prev.files, ...uploadedFiles], updatedAt: new Date() }
           : null
         )
@@ -406,15 +441,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     try {
       setError(null)
       await fetchApi(`/projects/${projectId}/files/${fileId}`, { method: "DELETE" })
-      
-      setProjects(prev => prev.map(p => 
-        p.id === projectId 
+
+      setProjects(prev => prev.map(p =>
+        p.id === projectId
           ? { ...p, files: p.files.filter(f => f.id !== fileId), updatedAt: new Date() }
           : p
       ))
-      
+
       if (currentProject?.id === projectId) {
-        setCurrentProject(prev => prev 
+        setCurrentProject(prev => prev
           ? { ...prev, files: prev.files.filter(f => f.id !== fileId), updatedAt: new Date() }
           : null
         )
@@ -438,20 +473,20 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ title }),
       })
       const newChat = toProjectChat(data)
-      
-      setProjects(prev => prev.map(p => 
-        p.id === projectId 
+
+      setProjects(prev => prev.map(p =>
+        p.id === projectId
           ? { ...p, chats: [newChat, ...p.chats], updatedAt: new Date() }
           : p
       ))
-      
+
       if (currentProject?.id === projectId) {
-        setCurrentProject(prev => prev 
+        setCurrentProject(prev => prev
           ? { ...prev, chats: [newChat, ...prev.chats], updatedAt: new Date() }
           : null
         )
       }
-      
+
       setCurrentChatId(newChat.id)
       return newChat
     } catch (err) {
@@ -466,21 +501,21 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setError(null)
       const data = await fetchApi<MessageResponse[]>(`/chats/${chatId}/messages`)
       const messages = data.map(toMessage)
-      
-      const updateChats = (chats: ProjectChat[]) => 
-        chats.map(c => c.id === chatId 
+
+      const updateChats = (chats: ProjectChat[]) =>
+        chats.map(c => c.id === chatId
           ? { ...c, messages, messageCount: messages.length }
           : c
         )
-      
-      setProjects(prev => prev.map(p => 
-        p.id === projectId 
+
+      setProjects(prev => prev.map(p =>
+        p.id === projectId
           ? { ...p, chats: updateChats(p.chats) }
           : p
       ))
-      
+
       if (currentProject?.id === projectId) {
-        setCurrentProject(prev => prev 
+        setCurrentProject(prev => prev
           ? { ...prev, chats: updateChats(prev.chats) }
           : null
         )
@@ -492,8 +527,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [currentProject])
 
   const addMessageToChat = useCallback(async (
-    projectId: string, 
-    chatId: string, 
+    projectId: string,
+    chatId: string,
     message: Omit<ChatMessage, 'id' | 'timestamp'>
   ): Promise<ChatMessage> => {
     try {
@@ -507,26 +542,26 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         }),
       })
       const newMessage = toMessage(data)
-      
-      const updateChats = (chats: ProjectChat[]) => 
-        chats.map(c => c.id === chatId 
+
+      const updateChats = (chats: ProjectChat[]) =>
+        chats.map(c => c.id === chatId
           ? { ...c, messages: [...c.messages, newMessage], messageCount: c.messageCount + 1, updatedAt: new Date() }
           : c
         )
-      
-      setProjects(prev => prev.map(p => 
-        p.id === projectId 
+
+      setProjects(prev => prev.map(p =>
+        p.id === projectId
           ? { ...p, chats: updateChats(p.chats), updatedAt: new Date() }
           : p
       ))
-      
+
       if (currentProject?.id === projectId) {
-        setCurrentProject(prev => prev 
+        setCurrentProject(prev => prev
           ? { ...prev, chats: updateChats(prev.chats), updatedAt: new Date() }
           : null
         )
       }
-      
+
       return newMessage
     } catch (err) {
       console.error("Failed to add message:", err)
@@ -542,21 +577,21 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         method: "PUT",
         body: JSON.stringify({ title }),
       })
-      
-      const updateChats = (chats: ProjectChat[]) => 
-        chats.map(c => c.id === chatId 
+
+      const updateChats = (chats: ProjectChat[]) =>
+        chats.map(c => c.id === chatId
           ? { ...c, title, updatedAt: new Date() }
           : c
         )
-      
-      setProjects(prev => prev.map(p => 
-        p.id === projectId 
+
+      setProjects(prev => prev.map(p =>
+        p.id === projectId
           ? { ...p, chats: updateChats(p.chats), updatedAt: new Date() }
           : p
       ))
-      
+
       if (currentProject?.id === projectId) {
-        setCurrentProject(prev => prev 
+        setCurrentProject(prev => prev
           ? { ...prev, chats: updateChats(prev.chats), updatedAt: new Date() }
           : null
         )
@@ -572,22 +607,22 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     try {
       setError(null)
       await fetchApi(`/chats/${chatId}`, { method: "DELETE" })
-      
+
       const filterChats = (chats: ProjectChat[]) => chats.filter(c => c.id !== chatId)
-      
-      setProjects(prev => prev.map(p => 
-        p.id === projectId 
+
+      setProjects(prev => prev.map(p =>
+        p.id === projectId
           ? { ...p, chats: filterChats(p.chats), updatedAt: new Date() }
           : p
       ))
-      
+
       if (currentProject?.id === projectId) {
-        setCurrentProject(prev => prev 
+        setCurrentProject(prev => prev
           ? { ...prev, chats: filterChats(prev.chats), updatedAt: new Date() }
           : null
         )
       }
-      
+
       if (currentChatId === chatId) {
         setCurrentChatId(null)
       }
@@ -620,12 +655,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ title }),
       })
       const newChat = toGeneralChat(data)
-      
+
       setGeneralChats(prev => [newChat, ...prev])
       setCurrentGeneralChatId(newChat.id)
       setCurrentProject(null)
       setCurrentChatId(null)
-      
+
       return newChat
     } catch (err) {
       console.error("Failed to create general chat:", err)
@@ -635,7 +670,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addMessageToGeneralChat = useCallback(async (
-    chatId: string, 
+    chatId: string,
     message: Omit<ChatMessage, 'id' | 'timestamp'>
   ): Promise<ChatMessage> => {
     try {
@@ -649,13 +684,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         }),
       })
       const newMessage = toMessage(data)
-      
-      setGeneralChats(prev => prev.map(c => 
-        c.id === chatId 
+
+      setGeneralChats(prev => prev.map(c =>
+        c.id === chatId
           ? { ...c, messages: [...c.messages, newMessage], messageCount: c.messageCount + 1, updatedAt: new Date() }
           : c
       ))
-      
+
       return newMessage
     } catch (err) {
       console.error("Failed to add message:", err)
@@ -671,9 +706,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         method: "PUT",
         body: JSON.stringify({ title }),
       })
-      
-      setGeneralChats(prev => prev.map(c => 
-        c.id === chatId 
+
+      setGeneralChats(prev => prev.map(c =>
+        c.id === chatId
           ? { ...c, title, updatedAt: new Date() }
           : c
       ))
@@ -688,9 +723,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     try {
       setError(null)
       await fetchApi(`/chats/${chatId}`, { method: "DELETE" })
-      
+
       setGeneralChats(prev => prev.filter(c => c.id !== chatId))
-      
+
       if (currentGeneralChatId === chatId) {
         setCurrentGeneralChatId(null)
       }

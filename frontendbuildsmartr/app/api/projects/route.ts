@@ -26,7 +26,15 @@ export async function GET() {
     })
     const data = await response.json().catch(() => ({}))
     console.log("[api/projects] Backend response:", response.status, data)
-    return NextResponse.json(data, { status: response.status })
+
+    // Add cache headers for browser-level caching
+    const headers = new Headers()
+    headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300')
+
+    return NextResponse.json(data, {
+      status: response.status,
+      headers
+    })
   } catch (error) {
     console.error("[api/projects] Error:", error)
     if (error instanceof Error) {
