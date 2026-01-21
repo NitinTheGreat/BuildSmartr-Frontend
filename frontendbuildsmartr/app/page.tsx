@@ -3,15 +3,7 @@ import { Suspense } from "react";
 import AuthButtons from "@/components/AuthButtons";
 import AuthStateListener from "@/components/AuthStateListener";
 import { GeneralChatInterface } from "@/components/GeneralChatInterface";
-
-// Simple loading fallback
-function LoadingSkeleton() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
-    </div>
-  );
-}
+import { HomepageSkeleton } from "@/components/ui/skeletons";
 
 export default async function Page() {
   const supabase = await createClient();
@@ -24,7 +16,7 @@ export default async function Page() {
   // Authenticated users see the dashboard with projects
   if (user) {
     return (
-      <Suspense fallback={<LoadingSkeleton />}>
+      <Suspense fallback={<HomepageSkeleton />}>
         <GeneralChatInterface />
       </Suspense>
     );

@@ -333,7 +333,7 @@ export function GeneralChatInterface() {
                       type="submit"
                       size="icon"
                       disabled={!query.trim() || isSubmitting}
-                      className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
+                      className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
                       aria-label="Send"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">

@@ -45,6 +45,12 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Optimistic message - shown immediately when user sends
+  const [optimisticMessage, setOptimisticMessage] = useState<{ content: string; searchModes?: SearchMode[] } | null>(null)
+  // Message queue - messages waiting to be processed
+  const [messageQueue, setMessageQueue] = useState<{ content: string; searchModes?: SearchMode[] }[]>([])
+  // Track if we're currently processing a message
+  const [isProcessing, setIsProcessing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -205,115 +211,145 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     await deleteChat(project.id, chatId)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!query.trim() || isSubmitting || isStreaming) return
-
-    setIsSubmitting(true)
+  // Process a single message - handles backend communication
+  const processMessage = async (messageContent: string, modes: SearchMode[]) => {
+    setIsProcessing(true)
     resetStreaming()
 
     try {
-      // If no current chat, create one
+      // If no current chat, create one in background
       let chatId = currentChatId
       if (!chatId) {
-        const newChat = await createChat(project.id, query.trim().slice(0, 50))
-        chatId = newChat.id
+        // Need to wait for chat creation so we can use the ID
+        try {
+          const newChat = await createChat(project.id, messageContent.slice(0, 50))
+          chatId = newChat.id
+        } catch (err) {
+          console.error('Failed to create chat:', err)
+          setIsProcessing(false)
+          setOptimisticMessage(null)
+          return
+        }
       }
 
       const userMessage = {
         role: 'user' as const,
-        content: query.trim(),
-        searchModes: selectedModes.length > 0 ? selectedModes : undefined,
+        content: messageContent,
+        searchModes: modes.length > 0 ? modes : undefined,
       }
 
-      await addMessageToChat(project.id, chatId, userMessage)
+      // Save user message to backend (fire and forget for speed)
+      addMessageToChat(project.id, chatId, userMessage).catch(console.error)
 
       // Update chat title if it's the first message
       const chat = project.chats.find(c => c.id === chatId)
       if (chat && chat.messages.length === 0) {
-        await updateChatTitle(project.id, chatId, query.trim().slice(0, 50))
+        updateChatTitle(project.id, chatId, messageContent.slice(0, 50)).catch(console.error)
       }
 
-      const currentQuery = query.trim()
-      setQuery("")
-      setIsSubmitting(false)
+      // DON'T clear optimistic message - let it stay visible until AI response starts
+      // setOptimisticMessage(null) -- removed for better UX
 
       // Use streaming search API
       try {
-        // Get the backend project_id from indexing state for search
         let backendProjectId = projectIndexingState?.backendProjectId
 
-        // Debug logging
-        console.log('🔍 [ProjectChatInterface] Chat search initiated')
-        console.log('   project.id:', project.id)
-        console.log('   project.name:', project.name)
-        console.log('   backendProjectId from indexing state:', backendProjectId)
-
-        // If backendProjectId is not available in indexing state, generate it deterministically
         if (!backendProjectId) {
-          console.log('   ⚠️ No backendProjectId in indexing state, generating via API...')
           try {
-            // Use generate_project_id endpoint - deterministic: same project_name + user_email = same project_id
             const response = await fetch('/api/projects/generate-id', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ project_name: project.name })
             })
-            console.log('   📡 /api/projects/generate-id response status:', response.status)
             if (response.ok) {
               const data = await response.json()
-              console.log('   📦 Generated project data:', data)
               if (data.project_id) {
                 backendProjectId = data.project_id
-                console.log('   ✅ Got backendProjectId:', backendProjectId)
               }
-            } else {
-              const errorData = await response.json().catch(() => ({}))
-              console.log('   ❌ API error:', errorData)
             }
           } catch (fetchError) {
-            console.error('   ❌ Failed to generate project ID:', fetchError)
+            console.error('Failed to generate project ID:', fetchError)
           }
         }
 
+        // Clear optimistic message just before we start getting AI response
+        setOptimisticMessage(null)
+
         if (!backendProjectId) {
-          console.error('[ProjectChatInterface] No backendProjectId - project may not be indexed yet')
           const errorMessage = {
             role: 'assistant' as const,
             content: 'This project hasn\'t been indexed yet. Please index your emails first to enable AI search.',
           }
-          await addMessageToChat(project.id, chatId!, errorMessage)
+          addMessageToChat(project.id, chatId!, errorMessage).catch(console.error)
           return
         }
 
-        console.log('   🚀 Sending search with project_id:', backendProjectId)
-        const aiResponse = await streamSearch(backendProjectId, currentQuery)
+        const aiResponse = await streamSearch(backendProjectId, messageContent)
 
-        // Save the final response as assistant message
         if (aiResponse) {
           const assistantMessage = {
             role: 'assistant' as const,
             content: aiResponse,
           }
-          await addMessageToChat(project.id, chatId!, assistantMessage)
-          // Reset streaming state so the bubble disappears
+          addMessageToChat(project.id, chatId!, assistantMessage).catch(console.error)
           resetStreaming()
         }
       } catch (streamError) {
         console.error('Streaming search error:', streamError)
-        // Add error message as assistant response
         const errorMessage = {
           role: 'assistant' as const,
           content: `Sorry, I encountered an error while searching: ${streamError instanceof Error ? streamError.message : 'Unknown error'}. Please try again.`,
         }
-        await addMessageToChat(project.id, chatId!, errorMessage)
+        addMessageToChat(project.id, chatId!, errorMessage).catch(console.error)
         resetStreaming()
       }
     } catch (error) {
-      console.error('Failed to submit message:', error)
-      setIsSubmitting(false)
+      console.error('Failed to process message:', error)
+    } finally {
+      setIsProcessing(false)
+      setOptimisticMessage(null)
+      // Process next message in queue if any
+      setMessageQueue(prev => {
+        if (prev.length > 0) {
+          const [next, ...rest] = prev
+          // Process next message immediately
+          requestAnimationFrame(() => {
+            setOptimisticMessage(next)
+            processMessage(next.content, next.searchModes || [])
+          })
+          return rest
+        }
+        return prev
+      })
     }
   }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!query.trim()) return
+
+    const messageContent = query.trim()
+    const modes = [...selectedModes]
+
+    // Use requestAnimationFrame for absolutely instant UI update
+    requestAnimationFrame(() => {
+      // Clear input IMMEDIATELY for snappy feel
+      setQuery("")
+
+      // If already processing, add to queue
+      if (isProcessing || isStreaming) {
+        setMessageQueue(prev => [...prev, { content: messageContent, searchModes: modes.length > 0 ? modes : undefined }])
+        return
+      }
+
+      // Show message optimistically IMMEDIATELY
+      setOptimisticMessage({ content: messageContent, searchModes: modes.length > 0 ? modes : undefined })
+
+      // Process in background (non-blocking)
+      processMessage(messageContent, modes)
+    })
+  }
+
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -439,7 +475,57 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 </motion.div>
               ))}
 
-              {/* Streaming message bubble */}
+              {/* Optimistic message - shown immediately when user sends (but not if already in messages) */}
+              {optimisticMessage && !messages.some(m => m.role === 'user' && m.content === optimisticMessage.content) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex justify-end"
+                >
+                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-accent text-background rounded-br-md">
+                    {optimisticMessage.searchModes && optimisticMessage.searchModes.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {optimisticMessage.searchModes.map(mode => {
+                          const Icon = getModeIcon(mode)
+                          return (
+                            <span
+                              key={mode}
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-background/20 text-background"
+                            >
+                              <Icon className="w-2.5 h-2.5" />
+                              {getModeLabel(mode)}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <p className="text-sm whitespace-pre-wrap">{optimisticMessage.content}</p>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Queued messages - shown as subtle compact list */}
+              {messageQueue.length > 0 && (
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] space-y-2">
+                    <div className="text-xs text-muted-foreground text-right flex items-center justify-end gap-2">
+                      <span className="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                      {messageQueue.length} message{messageQueue.length !== 1 ? 's' : ''} queued
+                    </div>
+                    {messageQueue.map((queuedMsg, index) => (
+                      <motion.div
+                        key={`queued-${index}`}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 0.6, x: 0 }}
+                        className="px-3 py-2 bg-accent/30 border border-accent/20 rounded-lg text-sm text-foreground/80 text-right"
+                      >
+                        <span className="line-clamp-1">{queuedMsg.content}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(isStreaming || streamedContent) && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -649,10 +735,9 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                           type="submit"
                           size="icon"
                           disabled={!query.trim() || isStreaming}
-                          className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-8 w-8"
+                          className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-8 w-8"
                           aria-label="Send"
                         >
-                          {/* Use send icon with bluish accent */}
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
                           </svg>
@@ -959,10 +1044,9 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                       type="submit"
                       size="icon"
                       disabled={!query.trim() || isStreaming}
-                      className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50"
+                      className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50"
                       aria-label="Send"
                     >
-                      {/* Use send icon with bluish accent */}
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
                       </svg>
