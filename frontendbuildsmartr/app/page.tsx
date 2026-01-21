@@ -1,6 +1,17 @@
 import { createClient } from "@/utils/supabase/server";
+import { Suspense } from "react";
 import AuthButtons from "@/components/AuthButtons";
 import AuthStateListener from "@/components/AuthStateListener";
+import { GeneralChatInterface } from "@/components/GeneralChatInterface";
+
+// Simple loading fallback
+function LoadingSkeleton() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="animate-pulse text-muted-foreground">Loading...</div>
+    </div>
+  );
+}
 
 export default async function Page() {
   const supabase = await createClient();
@@ -10,10 +21,16 @@ export default async function Page() {
 
   console.log("[page.tsx] user:", user?.email ?? "not authenticated");
 
+  // Authenticated users see the dashboard with projects
   if (user) {
-    return <div className="p-4 text-foreground">You are signed in as {user.email}.</div>;
+    return (
+      <Suspense fallback={<LoadingSkeleton />}>
+        <GeneralChatInterface />
+      </Suspense>
+    );
   }
 
+  // Unauthenticated users see the login page
   return (
     <>
       <AuthStateListener />
@@ -32,14 +49,12 @@ export default async function Page() {
               Sign in to continue to your account
             </p>
           </div>
-          
+
           <div className="bg-surface/50 backdrop-blur-sm border border-border/50 rounded-2xl p-8 shadow-xl">
             <div className="flex flex-col items-center">
               <AuthButtons />
             </div>
           </div>
-          
-          
         </div>
       </div>
     </>

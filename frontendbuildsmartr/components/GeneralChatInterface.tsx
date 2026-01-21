@@ -4,45 +4,52 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { Sparkles, Mic, Globe, Mail, Quote, FileText, ChevronDown, X, MessageSquare } from "lucide-react"
+import { FolderPlus, FolderOpen, ArrowRight, MessageSquare, X } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
 import type { SearchMode } from "@/types/project"
-import { SearchInterface } from "./SearchInterface"
-
-interface SearchModeOption {
-  id: SearchMode
-  label: string
-  icon: React.ElementType
-  exclusive?: boolean
-}
-
-const searchModeOptions: SearchModeOption[] = [
-  { id: 'web', label: 'Web Search', icon: Globe },
-  { id: 'email', label: 'Email Search', icon: Mail },
-  { id: 'quotes', label: 'Quotes', icon: Quote },
-  { id: 'pdf', label: 'PDF Search', icon: FileText, exclusive: true },
-]
+import { NewProjectModal } from "./NewProjectModal"
+import { createClient } from "@/utils/supabase/client"
 
 export function GeneralChatInterface() {
   const [query, setQuery] = useState("")
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false)
+  const [userName, setUserName] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
-  const { 
+  const {
+    projects,
     generalChats,
     currentGeneralChatId,
     createGeneralChat,
     addMessageToGeneralChat,
     updateGeneralChatTitle,
+    setCurrentProject,
   } = useProjects()
 
   const currentChat = generalChats.find(c => c.id === currentGeneralChatId)
   const messages = currentChat?.messages || []
+
+  // Fetch user name from Supabase
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        // Try to get name from user_metadata or email
+        const firstName = user.user_metadata?.first_name ||
+          user.user_metadata?.full_name?.split(' ')[0] ||
+          user.email?.split('@')[0] ||
+          null
+        setUserName(firstName)
+      }
+    })
+  }, [])
 
   // Auto-expand textarea based on content
   useEffect(() => {
@@ -69,38 +76,12 @@ export function GeneralChatInterface() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleModeToggle = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    
-    if (option?.exclusive) {
-      if (selectedModes.includes(mode)) {
-        setSelectedModes([])
-      } else {
-        setSelectedModes([mode])
-      }
-    } else {
-      if (selectedModes.includes('pdf')) {
-        setSelectedModes([mode])
-      } else if (selectedModes.includes(mode)) {
-        setSelectedModes(prev => prev.filter(m => m !== mode))
-      } else {
-        setSelectedModes(prev => [...prev, mode])
-      }
+  const handleProjectClick = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      setCurrentProject(project)
+      router.push(`/project/${projectId}`)
     }
-  }
-
-  const removeMode = (mode: SearchMode) => {
-    setSelectedModes(prev => prev.filter(m => m !== mode))
-  }
-
-  const getModeIcon = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.icon || Globe
-  }
-
-  const getModeLabel = (mode: SearchMode) => {
-    const option = searchModeOptions.find(o => o.id === mode)
-    return option?.label || mode
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,7 +90,7 @@ export function GeneralChatInterface() {
 
     setIsSubmitting(true)
     const currentQuery = query.trim()
-    
+
     try {
       let chatId = currentGeneralChatId
       if (!chatId) {
@@ -135,8 +116,8 @@ export function GeneralChatInterface() {
 
       // Simulate AI response
       setTimeout(async () => {
-        const modesText = selectedModes.length > 0 
-          ? `Using ${selectedModes.join(', ')} mode(s), ` 
+        const modesText = selectedModes.length > 0
+          ? `Using ${selectedModes.join(', ')} mode(s), `
           : ''
         const assistantMessage = {
           role: 'assistant' as const,
@@ -149,56 +130,136 @@ export function GeneralChatInterface() {
     }
   }
 
-  // If no current chat, show the welcome screen with SearchInterface
+  // Project-focused welcome screen (dashboard view)
   if (!currentChat) {
     return (
-      <motion.main 
-        className="min-h-screen flex flex-col items-center justify-center px-4 py-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        style={{
-          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)',
-        }}
-      >
-        {/* Logo */}
-        <motion.div 
-          className="mb-8 md:mb-12"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.5 }}
+      <>
+        <NewProjectModal
+          isOpen={isNewProjectModalOpen}
+          onClose={() => setIsNewProjectModalOpen(false)}
+        />
+        <motion.main
+          className="min-h-screen flex flex-col px-4 py-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          style={{
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 60px)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)',
+          }}
         >
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-            <span className="text-foreground">IIvy</span>
-          </h1>
-        </motion.div>
+          <div className="w-full max-w-4xl mx-auto">
+            {/* Header */}
+            <motion.div
+              className="mb-8"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+            >
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
+                <span className="text-foreground">Welcome{userName ? `, ${userName}` : ''}</span>
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Manage your construction projects with AI-powered insights
+              </p>
+            </motion.div>
 
-        {/* Search Interface */}
-        <motion.div
-          className="w-full"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
-          <SearchInterface />
-        </motion.div>
-      </motion.main>
+            {/* New Project CTA - Prominent */}
+            {projects.length === 0 ? (
+              <motion.div
+                className="mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+              >
+                <div className="bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 rounded-2xl p-8 text-center">
+                  <div className="w-16 h-16 bg-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <FolderPlus className="w-8 h-8 text-accent" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">Create your first project</h2>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Upload your construction documents, connect your email, and let IIvy help you find answers instantly.
+                  </p>
+                  <Button
+                    onClick={() => setIsNewProjectModalOpen(true)}
+                    className="bg-accent hover:bg-accent-strong text-background px-6 py-2 rounded-lg font-medium cursor-pointer"
+                  >
+                    <FolderPlus className="w-4 h-4 mr-2" />
+                    New Project
+                  </Button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                className="mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+              >
+                <Button
+                  onClick={() => setIsNewProjectModalOpen(true)}
+                  className="bg-accent hover:bg-accent-strong text-background px-5 py-2.5 rounded-lg font-medium cursor-pointer"
+                >
+                  <FolderPlus className="w-4 h-4 mr-2" />
+                  New Project
+                </Button>
+              </motion.div>
+            )}
+
+            {/* Projects Grid */}
+            {projects.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-foreground">Your Projects</h2>
+                  <span className="text-sm text-muted-foreground">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projects.map((project, index) => (
+                    <motion.button
+                      key={project.id}
+                      onClick={() => handleProjectClick(project.id)}
+                      className="flex flex-col p-5 bg-surface border border-border rounded-xl hover:border-accent/50 hover:shadow-lg transition-all text-left group cursor-pointer"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + index * 0.05, duration: 0.4 }}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="p-2.5 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
+                          <FolderOpen className="w-5 h-5 text-accent" />
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-accent transition-all" />
+                      </div>
+                      <h3 className="font-semibold text-foreground mb-1 line-clamp-1">{project.name}</h3>
+                      {project.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{project.description}</p>
+                      )}
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </motion.main>
+      </>
     )
   }
 
   // Chat view with messages
   return (
-    <motion.div 
+    <motion.div
       className="min-h-screen flex flex-col"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
       {/* Header */}
-      <div 
+      <div
         className="sticky z-10 bg-background/80 backdrop-blur-md border-b border-border/50"
-        style={{ 
+        style={{
           top: 0,
           paddingTop: 'env(safe-area-inset-top, 0px)',
         }}
@@ -228,27 +289,6 @@ export function GeneralChatInterface() {
                   }
                 `}
               >
-                {/* Show search modes if present */}
-                {message.searchModes && message.searchModes.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {message.searchModes.map(mode => {
-                      const Icon = getModeIcon(mode)
-                      return (
-                        <span
-                          key={mode}
-                          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
-                            message.role === 'user' 
-                              ? 'bg-background/20 text-background' 
-                              : 'bg-accent/20 text-accent'
-                          }`}
-                        >
-                          <Icon className="w-2.5 h-2.5" />
-                          {getModeLabel(mode)}
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
               </div>
             </motion.div>
@@ -258,7 +298,7 @@ export function GeneralChatInterface() {
       </div>
 
       {/* Input at bottom */}
-      <div 
+      <div
         className="sticky bg-background/95 backdrop-blur-md border-t border-border/50 z-20 overflow-visible"
         style={{
           bottom: 0,
@@ -268,41 +308,6 @@ export function GeneralChatInterface() {
         <div className="max-w-3xl mx-auto px-4 py-3 md:py-4">
           <form onSubmit={handleSubmit} className="relative">
             <div className="relative bg-surface rounded-xl border border-border shadow-sm hover:border-muted transition-colors overflow-visible">
-              {/* Selected modes chips */}
-              <AnimatePresence>
-                {selectedModes.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="px-3 pt-2 flex flex-wrap gap-1.5"
-                  >
-                    {selectedModes.map(mode => {
-                      const Icon = getModeIcon(mode)
-                      return (
-                        <motion.div
-                          key={mode}
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          className="flex items-center gap-1 px-2 py-0.5 bg-accent/20 text-accent rounded-full text-xs font-medium"
-                        >
-                          <Icon className="w-3 h-3" />
-                          <span>{getModeLabel(mode)}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeMode(mode)}
-                            className="hover:bg-accent/30 rounded-full p-0.5 transition-colors"
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </motion.div>
-                      )
-                    })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               <div className="flex items-start gap-3 p-3">
                 <textarea
                   ref={textareaRef}
@@ -320,11 +325,6 @@ export function GeneralChatInterface() {
                 />
 
                 <div className="flex items-center gap-2">
-                  {/*
-                  // Search mode dropdown and icons commented out for now
-                  <div className="relative" ref={dropdownRef}> ... </div>
-                  <motion.button ... > <Mic className="size-4" /> </motion.button>
-                  */}
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -336,7 +336,6 @@ export function GeneralChatInterface() {
                       className="bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
                       aria-label="Send"
                     >
-                      {/* Use send icon with bluish accent */}
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
                       </svg>
