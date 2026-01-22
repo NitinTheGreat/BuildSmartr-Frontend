@@ -36,8 +36,16 @@ jobs:
         working-directory: frontendbuildsmartr
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
           NEXT_PUBLIC_AI_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_AI_BACKEND_URL }}
+          NEXT_PUBLIC_AZURE_FUNCTION_KEY: ${{ secrets.NEXT_PUBLIC_AZURE_FUNCTION_KEY }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
+          MICROSOFT_TENANT_ID: ${{ secrets.MICROSOFT_TENANT_ID }}
 
       - name: Deploy
         id: deploy
