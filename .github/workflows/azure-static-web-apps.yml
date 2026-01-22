@@ -25,12 +25,15 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: frontendbuildsmartr/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+        working-directory: frontendbuildsmartr
 
       - name: Build
         run: npm run build
+        working-directory: frontendbuildsmartr
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -44,7 +47,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           skip_app_build: true
-          app_location: ".next"
+          app_location: "frontendbuildsmartr/.next"
           output_location: ""
 
   close_pull_request_job:
