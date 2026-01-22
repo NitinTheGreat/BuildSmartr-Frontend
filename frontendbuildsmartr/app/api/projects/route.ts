@@ -8,7 +8,7 @@ export async function GET() {
   const { data: { session } } = await supabase.auth.getSession()
 
   if (!session?.access_token) {
-    console.log("[api/projects] No session or access token")
+    console.log("[api/projects] No valid session or access token")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
