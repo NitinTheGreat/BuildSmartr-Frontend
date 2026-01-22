@@ -13,7 +13,7 @@ export default async function Page() {
 
   console.log("[page.tsx] user:", user?.email ?? "not authenticated");
 
-  // Authenticated users see the dashboard with projects
+  // Authenticated users see  dashboard with projects
   if (user) {
     return (
       <Suspense fallback={<HomepageSkeleton />}>
