@@ -3,10 +3,15 @@ import { NextResponse } from "next/server";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
-const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
-  ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/email/gmail/callback`
-  : "http://localhost:3000/api/email/gmail/callback";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071";
+
+function getRedirectUri() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    return `${appUrl.replace(/\/$/, '')}/api/email/gmail/callback`;
+  }
+  return "http://localhost:3000/api/email/gmail/callback";
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,6 +30,7 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
 
+  const GOOGLE_REDIRECT_URI = getRedirectUri();
   console.log("[Gmail OAuth] Session exists:", !!session);
   console.log("[Gmail OAuth] Redirect URI being used:", GOOGLE_REDIRECT_URI);
 

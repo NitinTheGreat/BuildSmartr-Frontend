@@ -3,9 +3,14 @@ import { NextResponse } from "next/server";
 
 // Gmail OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-const GOOGLE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
-  ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/email/gmail/callback`
-  : "http://localhost:3000/api/email/gmail/callback";
+
+function getRedirectUri() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    return `${appUrl.replace(/\/$/, '')}/api/email/gmail/callback`;
+  }
+  return "http://localhost:3000/api/email/gmail/callback";
+}
 
 // Gmail scopes needed for email access
 const GMAIL_SCOPES = [
@@ -25,6 +30,7 @@ export async function GET() {
   }
 
   // Build Google OAuth URL
+  const GOOGLE_REDIRECT_URI = getRedirectUri();
   console.log("[Gmail OAuth] NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
   console.log("[Gmail OAuth] Redirect URI being used in route.ts:", GOOGLE_REDIRECT_URI);
 
