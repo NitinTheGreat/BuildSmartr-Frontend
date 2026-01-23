@@ -34,9 +34,16 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Use the request URL origin to handle all environments correctly
-      const origin = new URL(request.url).origin;
-      return NextResponse.redirect(`${origin}${next}`);
+      const forwardedHost = request.headers.get("x-forwarded-host");
+      const isLocalEnv = process.env.NODE_ENV === "development";
+
+      if (isLocalEnv) {
+        return NextResponse.redirect(`http://localhost:3000${next}`);
+      } else if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+      } else {
+        return NextResponse.redirect(new URL(next, request.url));
+      }
     }
 
     console.error("[auth/callback] Error exchanging code:", error.message);
