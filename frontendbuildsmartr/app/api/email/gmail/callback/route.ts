@@ -13,18 +13,31 @@ function getRedirectUri() {
   return "http://localhost:3000/api/email/gmail/callback";
 }
 
+// Helper function to get the correct base URL for redirects
+// This fixes the issue where request.url returns internal Docker hostname in production
+function getAppBaseUrl() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    return appUrl.replace(/\/$/, '');
+  }
+  return "http://localhost:3000";
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
+  // Use the app base URL for all redirects (fixes Docker/reverse proxy issues)
+  const baseUrl = getAppBaseUrl();
+
   if (error) {
     console.error("[Gmail OAuth] Error:", error);
-    return NextResponse.redirect(new URL("/account?error=gmail_auth_failed", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=gmail_auth_failed`);
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL("/account?error=no_code", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=no_code`);
   }
 
   const supabase = await createClient();
@@ -33,10 +46,11 @@ export async function GET(request: Request) {
   const GOOGLE_REDIRECT_URI = getRedirectUri();
   console.log("[Gmail OAuth] Session exists:", !!session);
   console.log("[Gmail OAuth] Redirect URI being used:", GOOGLE_REDIRECT_URI);
+  console.log("[Gmail OAuth] App base URL for redirects:", baseUrl);
 
   if (!session?.access_token) {
     console.error("[Gmail OAuth] No session or access token found");
-    return NextResponse.redirect(new URL("/account?error=unauthorized", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=unauthorized`);
   }
 
   try {
@@ -61,7 +75,7 @@ export async function GET(request: Request) {
 
     if (tokens.error) {
       console.error("[Gmail OAuth] Token error:", tokens.error, tokens.error_description);
-      return NextResponse.redirect(new URL("/account?error=token_exchange_failed", request.url));
+      return NextResponse.redirect(`${baseUrl}/account?error=token_exchange_failed`);
     }
 
     // Get user's Gmail email from Google's userinfo endpoint
@@ -77,7 +91,7 @@ export async function GET(request: Request) {
 
     if (!userInfo.email) {
       console.error("[Gmail OAuth] Failed to get user email from Google");
-      return NextResponse.redirect(new URL("/account?error=no_email", request.url));
+      return NextResponse.redirect(`${baseUrl}/account?error=no_email`);
     }
 
     // Construct the token object in the format expected by the backend
@@ -117,13 +131,13 @@ export async function GET(request: Request) {
       console.error("[Gmail OAuth] Backend error - URL:", `${BACKEND_URL}/api/user/connect/gmail`);
       console.error("[Gmail OAuth] Backend error - Status:", backendResponse.status);
       console.error("[Gmail OAuth] Backend error - Response:", errorText);
-      return NextResponse.redirect(new URL("/account?error=backend_error", request.url));
+      return NextResponse.redirect(`${baseUrl}/account?error=backend_error`);
     }
 
     console.log("[Gmail OAuth] Successfully connected Gmail!");
-    return NextResponse.redirect(new URL("/account?success=gmail_connected", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?success=gmail_connected`);
   } catch (err) {
     console.error("[Gmail OAuth] Unexpected error:", err);
-    return NextResponse.redirect(new URL("/account?error=unexpected_error", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=unexpected_error`);
   }
 }

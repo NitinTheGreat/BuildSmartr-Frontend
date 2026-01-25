@@ -9,26 +9,39 @@ const AZURE_REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL
   : "http://localhost:3000/api/email/outlook/callback";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071";
 
+// Helper function to get the correct base URL for redirects
+// This fixes the issue where request.url returns internal Docker hostname in production
+function getAppBaseUrl() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    return appUrl.replace(/\/$/, '');
+  }
+  return "http://localhost:3000";
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
+  
+  // Use the app base URL for all redirects (fixes Docker/reverse proxy issues)
+  const baseUrl = getAppBaseUrl();
 
   if (error) {
     console.error("[Outlook OAuth] Error:", error, errorDescription);
-    return NextResponse.redirect(new URL("/account?error=outlook_auth_failed", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=outlook_auth_failed`);
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL("/account?error=no_code", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=no_code`);
   }
 
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session?.access_token) {
-    return NextResponse.redirect(new URL("/account?error=unauthorized", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=unauthorized`);
   }
 
   try {
@@ -54,7 +67,7 @@ export async function GET(request: Request) {
 
     if (tokens.error) {
       console.error("[Outlook OAuth] Token error:", tokens.error, tokens.error_description);
-      return NextResponse.redirect(new URL("/account?error=token_exchange_failed", request.url));
+      return NextResponse.redirect(`${baseUrl}/account?error=token_exchange_failed`);
     }
 
     // Call backend to store the Outlook connection
@@ -76,12 +89,12 @@ export async function GET(request: Request) {
     if (!backendResponse.ok) {
       const errorData = await backendResponse.json().catch(() => ({}));
       console.error("[Outlook OAuth] Backend error:", errorData);
-      return NextResponse.redirect(new URL("/account?error=backend_error", request.url));
+      return NextResponse.redirect(`${baseUrl}/account?error=backend_error`);
     }
 
-    return NextResponse.redirect(new URL("/account?success=outlook_connected", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?success=outlook_connected`);
   } catch (err) {
     console.error("[Outlook OAuth] Unexpected error:", err);
-    return NextResponse.redirect(new URL("/account?error=unexpected_error", request.url));
+    return NextResponse.redirect(`${baseUrl}/account?error=unexpected_error`);
   }
 }

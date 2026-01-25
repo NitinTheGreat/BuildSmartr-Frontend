@@ -2,10 +2,23 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+// Helper function to get the correct base URL for redirects
+// This fixes the issue where request.url returns internal Docker hostname in production
+function getAppBaseUrl() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    return appUrl.replace(/\/$/, '');
+  }
+  return "http://localhost:3000";
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/chat";
+  const next = searchParams.get("next") ?? "/";
+  
+  // Use the app base URL for all redirects (fixes Docker/reverse proxy issues)
+  const baseUrl = getAppBaseUrl();
 
   if (code) {
     const cookieStore = await cookies();
@@ -34,21 +47,12 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const forwardedHost = request.headers.get("x-forwarded-host");
-      const isLocalEnv = process.env.NODE_ENV === "development";
-
-      if (isLocalEnv) {
-        return NextResponse.redirect(`http://localhost:3000${next}`);
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
-      } else {
-        return NextResponse.redirect(new URL(next, request.url));
-      }
+      return NextResponse.redirect(`${baseUrl}${next}`);
     }
 
     console.error("[auth/callback] Error exchanging code:", error.message);
   }
 
   // Return to home on error
-  return NextResponse.redirect(new URL("/", request.url));
+  return NextResponse.redirect(`${baseUrl}/`);
 }
