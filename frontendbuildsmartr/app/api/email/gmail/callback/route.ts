@@ -90,8 +90,6 @@ export async function GET(request: Request) {
       client_secret: GOOGLE_CLIENT_SECRET,
       scopes: tokens.scope ? tokens.scope.split(" ") : [
         "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/gmail.send",
-        "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
       ],
