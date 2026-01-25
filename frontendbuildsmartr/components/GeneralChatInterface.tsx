@@ -332,22 +332,17 @@ export function GeneralChatInterface() {
                 />
 
                 <div className="flex items-center gap-2">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!query.trim() || isSubmitting}
+                    className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                    aria-label="Send"
                   >
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={!query.trim() || isSubmitting}
-                      className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-9 w-9 md:h-8 md:w-8 transition-all duration-200"
-                      aria-label="Send"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
-                      </svg>
-                    </Button>
-                  </motion.div>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                    </svg>
+                  </Button>
                 </div>
               </div>
             </div>

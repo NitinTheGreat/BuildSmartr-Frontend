@@ -114,14 +114,14 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
           // Expanded: Logo + Name on left, collapse button on right
           <>
             <Link href="/" onClick={closeMobileMenu} className="flex items-center gap-3 min-w-0">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="cursor-pointer flex items-center gap-3">
+              <div className="cursor-pointer flex items-center gap-3 transition-transform duration-150 hover:scale-105 active:scale-95">
                 <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
                   <Image src={logo} alt="Logo" width={40} height={40} />
                 </div>
                 {firstName && (
                   <span className="text-sm font-medium text-foreground truncate">{firstName}</span>
                 )}
-              </motion.div>
+              </div>
             </Link>
 
             {/* Collapse button - only on desktop */}
@@ -139,11 +139,11 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
           // Collapsed: Logo with expand icon on hover
           <div className="relative group/logo">
             <Link href="/" onClick={closeMobileMenu}>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="cursor-pointer">
+              <div className="cursor-pointer transition-transform duration-150 hover:scale-105 active:scale-95">
                 <div className="w-12 h-12 flex items-center justify-center">
                   <Image src={logo} alt="Logo" width={48} height={48} />
                 </div>
-              </motion.div>
+              </div>
             </Link>
 
             {/* Expand button - appears on hover */}
@@ -200,18 +200,16 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
       <div className={`flex-1 w-full ${isExpandedView ? 'px-3' : 'px-2'} overflow-hidden flex flex-col`}>
         {/* New Project Button */}
         <Tooltip label="New Project">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <button
             onClick={() => setIsNewProjectModalOpen(true)}
             className={`
-              flex items-center ${isExpandedView ? 'justify-start gap-3 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors 
+              flex items-center ${isExpandedView ? 'justify-start gap-3 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]
               bg-transparent border border-dashed border-border hover:border-accent hover:bg-[#1e293b]/50 text-muted-foreground hover:text-foreground w-full mb-3
             `}
           >
             <FolderOpen className="w-4 h-4 flex-shrink-0" />
             {isExpandedView && <span className="text-sm font-medium">New Project</span>}
-          </motion.button>
+          </button>
         </Tooltip>
 
         {/* Scrollable content area for projects and chats */}
@@ -254,11 +252,10 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                   return (
                     <div key={project.id}>
                       <Tooltip label={project.name}>
-                        <motion.div
-                          whileTap={{ scale: 0.98 }}
+                        <div
                           onClick={(e) => handleProjectClick(project.id, e)}
                           className={`
-                            flex flex-col ${isExpandedView ? 'gap-1 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
+                            flex flex-col ${isExpandedView ? 'gap-1 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-all duration-150 active:scale-[0.98] group
                             ${isCurrentProject
                               ? 'bg-accent/20 text-foreground'
                               : 'hover:bg-[#1e293b] text-muted-foreground hover:text-foreground'
@@ -319,7 +316,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                               </p>
                             </div>
                           )}
-                        </motion.div>
+                        </div>
                       </Tooltip>
 
                       {/* Chats list - shown when project is expanded */}
@@ -332,16 +329,14 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                             className="ml-6 mt-1 space-y-1 border-l border-border pl-2"
                           >
                             {project.chats.map((chat) => (
-                              <motion.div
+                              <div
                                 key={chat.id}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
                                 onClick={() => handleChatClick(project.id, chat.id)}
-                                className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors hover:bg-[#1e293b] text-muted-foreground hover:text-foreground"
+                                className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:bg-[#1e293b] text-muted-foreground hover:text-foreground"
                               >
                                 <MessageSquare className="w-3 h-3 flex-shrink-0" />
                                 <span className="text-xs truncate">{chat.title}</span>
-                              </motion.div>
+                              </div>
                             ))}
                           </motion.div>
                         </AnimatePresence>
@@ -390,11 +385,9 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
       <div className={`w-full ${isExpandedView ? 'px-3' : 'px-2'} border-t border-border pt-4`}>
         <div className="relative group/profile">
           <Link href="/account" onClick={closeMobileMenu}>
-            <motion.div
-              whileHover={{ backgroundColor: "#1e293b" }}
-              whileTap={{ scale: 0.98 }}
+            <div
               className={`
-                flex items-center ${isExpandedView ? 'gap-3 px-2' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors
+                flex items-center ${isExpandedView ? 'gap-3 px-2' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-[#1e293b] active:scale-[0.98]
               `}
             >
               <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -410,7 +403,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                   <span className="text-sm text-foreground truncate block">{firstName || 'Account'}</span>
                 </div>
               )}
-            </motion.div>
+            </div>
           </Link>
 
           {/* Logout dropdown - shows on hover using CSS */}

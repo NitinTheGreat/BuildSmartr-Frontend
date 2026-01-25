@@ -187,20 +187,18 @@ export function SearchInterface() {
             <div className="flex items-center gap-2 mt-2">
               {/* Search mode dropdown */}
               <div className="relative" ref={dropdownRef}>
-                <motion.button
+                <button
                   type="button"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className={`flex items-center gap-1 p-1.5 rounded-lg transition-colors ${
+                  className={`flex items-center gap-1 p-1.5 rounded-lg transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer ${
                     selectedModes.length > 0 
                       ? 'text-accent bg-accent/10' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-[#1e293b]'
                   }`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                 >
                   <Globe className="w-5 h-5" />
                   <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                </motion.button>
+                </button>
 
                 <AnimatePresence>
                   {isDropdownOpen && (
@@ -253,30 +251,23 @@ export function SearchInterface() {
                 </AnimatePresence>
               </div>
 
-              <motion.button
+              <button
                 type="button"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
+                className="text-muted-foreground hover:text-foreground transition-all duration-150 hover:scale-110 active:scale-95 cursor-pointer"
                 aria-label="Voice input"
               >
                 <Mic className="size-5" />
-              </motion.button>
+              </button>
 
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!query.trim()}
+                className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 transition-transform duration-150 hover:scale-105 active:scale-95 cursor-pointer"
+                aria-label="Submit"
               >
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!query.trim()}
-                  className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50"
-                  aria-label="Submit"
-                >
-                  <Sparkles className="size-5" />
-                </Button>
-              </motion.div>
+                <Sparkles className="size-5" />
+              </Button>
             </div>
           </div>
         </div>
