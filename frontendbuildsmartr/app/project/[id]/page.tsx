@@ -10,10 +10,9 @@ import { motion } from "framer-motion"
 export default function ProjectPage() {
   const params = useParams()
   const router = useRouter()
-  const { projects, currentProject, setCurrentProject, loadProject } = useProjects()
-  const [isLoading, setIsLoading] = useState(true)
+  const { projects, currentProject, setCurrentProject, loadProject, isLoading: isContextLoading } = useProjects()
+  const [isPageLoading, setIsPageLoading] = useState(true)
   const hasLoadedRef = useRef(false)
-
   const projectId = params.id as string
 
   useEffect(() => {
@@ -21,11 +20,16 @@ export default function ProjectPage() {
     if (hasLoadedRef.current) return
 
     const initializeProject = async () => {
-      // Wait for projects to be loaded first
-      if (projects.length === 0) return
+      // Check if we already have this project in the list
+      const existingProject = projects.find(p => p.id === projectId)
+      
+      // If context is still doing initial load and we don't have the project yet, wait
+      if (isContextLoading && !existingProject) {
+        return
+      }
 
       hasLoadedRef.current = true
-      setIsLoading(true)
+      setIsPageLoading(true)
 
       // Load full project details (including files and chats)
       const fullProject = await loadProject(projectId)
@@ -33,19 +37,19 @@ export default function ProjectPage() {
       if (fullProject) {
         setCurrentProject(fullProject)
       } else {
-        // Project not found, redirect to chat
-        router.push('/chat')
+        // Project not found, redirect to home
+        router.push('/')
         return
       }
 
-      setIsLoading(false)
+      setIsPageLoading(false)
     }
 
     initializeProject()
-  }, [projectId, projects.length]) // Only depend on projectId and projects.length
+  }, [projectId, projects, isContextLoading, loadProject, setCurrentProject, router])
 
-  // Show loading state with crafted skeleton
-  if (isLoading || !currentProject || currentProject.id !== projectId) {
+  // Show loading state with enhanced skeleton
+  if (isPageLoading || !currentProject || currentProject.id !== projectId) {
     return <ProjectSkeleton />
   }
 

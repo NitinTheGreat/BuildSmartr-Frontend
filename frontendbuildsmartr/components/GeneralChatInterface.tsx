@@ -4,12 +4,13 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { FolderPlus, FolderOpen, ArrowRight, MessageSquare, X } from "lucide-react"
+import { FolderPlus, FolderOpen, ArrowRight, MessageSquare } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
 import type { SearchMode } from "@/types/project"
 import { NewProjectModal } from "./NewProjectModal"
 import { createClient } from "@/utils/supabase/client"
+import { HomepageSkeleton } from "@/components/ui/skeletons"
 
 export function GeneralChatInterface() {
   const [query, setQuery] = useState("")
@@ -31,6 +32,7 @@ export function GeneralChatInterface() {
     addMessageToGeneralChat,
     updateGeneralChatTitle,
     setCurrentProject,
+    isLoading: isProjectsLoading,
   } = useProjects()
 
   const currentChat = generalChats.find(c => c.id === currentGeneralChatId)
@@ -128,6 +130,11 @@ export function GeneralChatInterface() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Show loading screen while projects are being loaded
+  if (isProjectsLoading && projects.length === 0) {
+    return <HomepageSkeleton />
   }
 
   // Project-focused welcome screen (dashboard view)

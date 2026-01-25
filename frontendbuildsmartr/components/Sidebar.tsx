@@ -36,23 +36,19 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
     router.refresh()
   }
 
+  // Only listen for auth state changes (avatar/name updates)
+  // Initial data is passed via props from server component to avoid duplicate auth calls
   useEffect(() => {
     const supabase = createClient()
 
-    supabase.auth.getUser().then(({ data }) => {
-      const meta = data.user?.user_metadata
-      const url = (meta?.avatar_url ?? meta?.picture) as string | undefined
-      const name = (meta?.full_name ?? meta?.name) as string | undefined
-      setAvatarUrl(url ?? null)
-      setFirstName(name?.split(" ")[0] ?? null)
-    })
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const meta = session?.user?.user_metadata
-      const url = (meta?.avatar_url ?? meta?.picture) as string | undefined
-      const name = (meta?.full_name ?? meta?.name) as string | undefined
-      setAvatarUrl(url ?? null)
-      setFirstName(name?.split(" ")[0] ?? null)
+      if (session) {
+        const meta = session.user?.user_metadata
+        const url = (meta?.avatar_url ?? meta?.picture) as string | undefined
+        const name = (meta?.full_name ?? meta?.name) as string | undefined
+        setAvatarUrl(url ?? null)
+        setFirstName(name?.split(" ")[0] ?? null)
+      }
     })
 
     return () => listener.subscription.unsubscribe()

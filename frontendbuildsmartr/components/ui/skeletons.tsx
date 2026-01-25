@@ -1,6 +1,7 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 
 // Base skeleton component with shimmer animation
 export function Skeleton({
@@ -102,38 +103,122 @@ export function SkeletonProjectTile() {
     )
 }
 
-// Homepage skeleton
+// Homepage skeleton with dynamic loading messages
 export function HomepageSkeleton() {
+    const [messageIndex, setMessageIndex] = useState(0)
+    const [progress, setProgress] = useState(0)
+    const messages = [
+        { text: "Preparing your workspace...", icon: "🔗" },
+        { text: "Gathering project data...", icon: "📊" },
+        { text: "Organizing insights...", icon: "⚡" },
+        { text: "Almost ready...", icon: "✨" },
+    ]
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setMessageIndex((prev) => (prev + 1) % messages.length)
+        }, 1800)
+        return () => clearInterval(interval)
+    }, [messages.length])
+
+    useEffect(() => {
+        const progressInterval = setInterval(() => {
+            setProgress((prev) => {
+                if (prev >= 90) return prev
+                return prev + Math.random() * 12
+            })
+        }, 400)
+        return () => clearInterval(progressInterval)
+    }, [])
+
     return (
         <motion.div
-            className="flex flex-col items-center justify-start min-h-screen p-4 pt-20"
+            className="flex flex-col items-center justify-center min-h-screen p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
         >
-            <div className="w-full max-w-4xl mx-auto">
-                {/* Welcome header skeleton */}
-                <div className="text-center mb-12">
-                    <Skeleton className="h-10 w-64 mx-auto mb-4" />
-                    <Skeleton className="h-5 w-48 mx-auto" />
+            <div className="text-center mb-8">
+                {/* Animated logo placeholder */}
+                <motion.div
+                    className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center relative"
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                >
+                    <motion.div
+                        className="w-10 h-10 rounded-xl bg-accent/30"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    />
+                    {/* Glow effect */}
+                    <motion.div
+                        className="absolute inset-0 rounded-2xl"
+                        animate={{
+                            boxShadow: [
+                                "0 0 0 0 rgba(0, 210, 211, 0)",
+                                "0 0 25px 8px rgba(0, 210, 211, 0.12)",
+                                "0 0 0 0 rgba(0, 210, 211, 0)",
+                            ],
+                        }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                </motion.div>
+
+                {/* Brand name */}
+                <motion.h1
+                    className="text-2xl font-bold mb-6"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                >
+                    <span className="bg-gradient-to-r from-accent to-accent-strong bg-clip-text text-transparent">
+                        IIVY
+                    </span>
+                </motion.h1>
+
+                {/* Dynamic message */}
+                <div className="h-8 flex items-center justify-center mb-6">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={messageIndex}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.25 }}
+                            className="flex items-center gap-2 text-muted-foreground"
+                        >
+                            <span className="text-lg">{messages[messageIndex].icon}</span>
+                            <span className="text-sm font-medium">{messages[messageIndex].text}</span>
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
 
-                {/* New Project button skeleton */}
-                <div className="flex justify-end mb-6">
-                    <Skeleton variant="rounded" className="h-10 w-32" />
+                {/* Progress bar */}
+                <div className="w-56 mx-auto mb-6">
+                    <div className="h-1.5 bg-muted/20 rounded-full overflow-hidden">
+                        <motion.div
+                            className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                        />
+                    </div>
                 </div>
 
-                {/* Projects grid skeleton */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Array.from({ length: 6 }).map((_, i) => (
+                {/* Loading dots */}
+                <div className="flex justify-center gap-1.5">
+                    {[0, 1, 2].map((i) => (
                         <motion.div
                             key={i}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.1, duration: 0.4 }}
-                        >
-                            <SkeletonProjectTile />
-                        </motion.div>
+                            className="w-2 h-2 rounded-full bg-accent"
+                            animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+                            transition={{
+                                duration: 0.8,
+                                repeat: Infinity,
+                                delay: i * 0.15,
+                                ease: "easeInOut",
+                            }}
+                        />
                     ))}
                 </div>
             </div>
@@ -141,8 +226,34 @@ export function HomepageSkeleton() {
     )
 }
 
-// Project page skeleton
+// Project page skeleton with dynamic loading
 export function ProjectSkeleton() {
+    const [messageIndex, setMessageIndex] = useState(0)
+    const [progress, setProgress] = useState(0)
+    const messages = [
+        { text: "Loading project details...", icon: "📁" },
+        { text: "Fetching your files...", icon: "📄" },
+        { text: "Preparing chat history...", icon: "💬" },
+        { text: "Almost ready...", icon: "✨" },
+    ]
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setMessageIndex((prev) => (prev + 1) % messages.length)
+        }, 1500)
+        return () => clearInterval(interval)
+    }, [messages.length])
+
+    useEffect(() => {
+        const progressInterval = setInterval(() => {
+            setProgress((prev) => {
+                if (prev >= 90) return prev
+                return prev + Math.random() * 15
+            })
+        }, 350)
+        return () => clearInterval(progressInterval)
+    }, [])
+
     return (
         <motion.div
             className="min-h-screen flex flex-col items-center justify-center p-8"
@@ -150,63 +261,83 @@ export function ProjectSkeleton() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
         >
-            {/* Project header */}
-            <div className="mb-8 text-center">
-                <div className="flex items-center justify-center gap-3 mb-4">
-                    <Skeleton variant="rounded" className="w-8 h-8" />
-                    <Skeleton className="h-8 w-48" />
-                </div>
-                <Skeleton className="h-4 w-64 mx-auto" />
-            </div>
+            <div className="text-center">
+                {/* Animated folder icon */}
+                <motion.div
+                    className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center relative"
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                >
+                    <motion.svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                        className="w-8 h-8 text-accent"
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </motion.svg>
+                    {/* Glow effect */}
+                    <motion.div
+                        className="absolute inset-0 rounded-2xl"
+                        animate={{
+                            boxShadow: [
+                                "0 0 0 0 rgba(0, 210, 211, 0)",
+                                "0 0 20px 6px rgba(0, 210, 211, 0.1)",
+                                "0 0 0 0 rgba(0, 210, 211, 0)",
+                            ],
+                        }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                </motion.div>
 
-            {/* Files section */}
-            <div className="w-full max-w-2xl mb-8">
-                <div className="flex items-center justify-between mb-3">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton variant="rounded" className="h-8 w-24" />
+                {/* Dynamic message */}
+                <div className="h-8 flex items-center justify-center mb-6">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={messageIndex}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.25 }}
+                            className="flex items-center gap-2 text-muted-foreground"
+                        >
+                            <span className="text-lg">{messages[messageIndex].icon}</span>
+                            <span className="text-sm font-medium">{messages[messageIndex].text}</span>
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                        <Skeleton key={i} variant="rounded" className="h-10 w-32" />
-                    ))}
-                </div>
-            </div>
 
-            {/* Chats section */}
-            <div className="w-full max-w-2xl mb-8">
-                <div className="flex items-center justify-between mb-3">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton variant="rounded" className="h-8 w-24" />
+                {/* Progress bar */}
+                <div className="w-48 mx-auto mb-6">
+                    <div className="h-1.5 bg-muted/20 rounded-full overflow-hidden">
+                        <motion.div
+                            className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                        />
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    {Array.from({ length: 3 }).map((_, i) => (
+
+                {/* Loading dots */}
+                <div className="flex justify-center gap-1.5">
+                    {[0, 1, 2].map((i) => (
                         <motion.div
                             key={i}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.1, duration: 0.3 }}
-                        >
-                            <div className="flex items-center justify-between p-3 bg-[#2b2d31] border border-border rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <Skeleton variant="circular" className="w-5 h-5" />
-                                    <div className="space-y-2">
-                                        <Skeleton className="h-4 w-32" />
-                                        <Skeleton className="h-3 w-20" />
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
+                            className="w-2 h-2 rounded-full bg-accent"
+                            animate={{ y: [0, -6, 0], opacity: [0.5, 1, 0.5] }}
+                            transition={{
+                                duration: 0.7,
+                                repeat: Infinity,
+                                delay: i * 0.12,
+                                ease: "easeInOut",
+                            }}
+                        />
                     ))}
-                </div>
-            </div>
-
-            {/* Input skeleton */}
-            <div className="w-full max-w-2xl">
-                <div className="bg-surface rounded-xl border border-border p-4">
-                    <div className="flex items-center gap-3">
-                        <Skeleton className="h-10 flex-1" />
-                        <Skeleton variant="circular" className="w-10 h-10" />
-                    </div>
                 </div>
             </div>
         </motion.div>

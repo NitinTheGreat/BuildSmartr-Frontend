@@ -209,32 +209,58 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     loadGeneralChats()
   }, [])
 
-  // Load data on auth state change
+  // Load data on auth state change - parallelized for faster loading
   useEffect(() => {
     const supabase = createClient()
     let isMounted = true
 
-    const loadData = async () => {
+    const loadAllData = async () => {
       // Prevent duplicate loads
       if (hasLoadedInitialData) return
 
       const { data: { session } } = await supabase.auth.getSession()
       if (session && isMounted) {
         setHasLoadedInitialData(true)
-        loadProjects()
-        loadGeneralChats()
+        setIsLoading(true)
+        
+        // Load projects and general chats in parallel for faster initial load
+        try {
+          await Promise.all([
+            loadProjects(),
+            loadGeneralChats()
+          ])
+        } catch (err) {
+          console.error("Error loading initial data:", err)
+        } finally {
+          if (isMounted) {
+            setIsLoading(false)
+          }
+        }
       }
     }
 
-    loadData()
+    loadAllData()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return
 
       if (session && event === 'SIGNED_IN' && !hasLoadedInitialData) {
         setHasLoadedInitialData(true)
-        loadProjects()
-        loadGeneralChats()
+        setIsLoading(true)
+        
+        // Load projects and general chats in parallel
+        try {
+          await Promise.all([
+            loadProjects(),
+            loadGeneralChats()
+          ])
+        } catch (err) {
+          console.error("Error loading data after sign in:", err)
+        } finally {
+          if (isMounted) {
+            setIsLoading(false)
+          }
+        }
       } else if (event === 'TOKEN_REFRESHED') {
         // Token refresh doesn't need to reload data
       } else if (event === 'SIGNED_OUT') {
@@ -244,6 +270,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setCurrentChatId(null)
         setCurrentGeneralChatId(null)
         setHasLoadedInitialData(false)
+        setIsLoading(false)
       }
     })
 
