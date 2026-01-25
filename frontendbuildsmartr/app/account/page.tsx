@@ -88,7 +88,6 @@ export default async function AccountPage() {
         <div className="bg-surface border border-border rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
           <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">Account Details</h3>
           <div className="space-y-4">
-            <DetailRow label="User ID" value={user.id} />
             <DetailRow label="Email" value={email} />
             <DetailRow label="Full Name" value={fullName} />
             <DetailRow label="Provider" value={provider} />
