@@ -57,29 +57,31 @@ export default function AuthButtons() {
         onClick={() => login("google")}
         variant="outline"
         size="lg"
-        className="group relative w-full h-14 text-base font-medium bg-white hover:bg-white text-gray-700 hover:text-gray-900 border border-gray-200 hover:border-gray-300 rounded-xl transition-all duration-300 overflow-hidden cursor-pointer hover:shadow-lg hover:shadow-gray-200/50 hover:scale-[1.02] active:scale-[0.98]"
+        className="group relative w-full h-14 text-base font-medium bg-transparent hover:bg-white/10 text-white border border-white/30 hover:border-white/50 rounded-xl transition-all duration-300 overflow-hidden cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
       >
-        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
+        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
         <GoogleLogo className="mr-3 relative z-10 transition-transform duration-300 group-hover:scale-110" />
         <span className="relative z-10">Continue with Google</span>
       </Button>
       
+      {/* Outlook sign-in temporarily disabled - Google only for now
       <Button
         onClick={() => login("azure")}
         variant="outline"
         size="lg"
-        className="group relative w-full h-14 text-base font-medium bg-white hover:bg-white text-gray-700 hover:text-gray-900 border border-gray-200 hover:border-blue-300 rounded-xl transition-all duration-300 overflow-hidden cursor-pointer hover:shadow-lg hover:shadow-blue-100/50 hover:scale-[1.02] active:scale-[0.98]"
+        className="group relative w-full h-14 text-base font-medium bg-transparent hover:bg-white/10 text-white border border-white/30 hover:border-white/50 rounded-xl transition-all duration-300 overflow-hidden cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
       >
-        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-50/80 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
+        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
         <Image
           src="/outlook.svg"
           alt="Outlook"
           width={20}
           height={20}
-          className="mr-3 relative z-10 transition-transform duration-300 group-hover:scale-110"
+          className="mr-3 relative z-10 transition-transform duration-300 group-hover:scale-110 brightness-0 invert"
         />
         <span className="relative z-10">Continue with Outlook</span>
       </Button>
+      */}
     </div>
   );
 }

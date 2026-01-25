@@ -58,7 +58,7 @@ export function OfflineModal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-[#3c3f45] rounded-lg transition-colors"
+              className="p-2 hover:bg-[#1e293b] rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
@@ -84,7 +84,7 @@ export function OfflineModal({
               <Button
                 variant="outline"
                 onClick={onClose}
-                className="flex-1 bg-transparent border-border hover:bg-[#3c3f45]"
+                className="flex-1 bg-transparent border-border hover:bg-[#1e293b]"
               >
                 Dismiss
               </Button>

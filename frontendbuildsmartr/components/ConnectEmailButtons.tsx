@@ -107,7 +107,7 @@ export default function ConnectEmailButtons({ gmailEmail, outlookEmail }: Connec
         </div>
       )}
 
-      {/* Outlook Connection - only show if no Gmail connected */}
+      {/* Outlook Connection temporarily disabled - Google only for now
       {!gmailEmail && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/20 rounded-lg gap-3">
           <div className="flex items-center gap-3">
@@ -148,6 +148,7 @@ export default function ConnectEmailButtons({ gmailEmail, outlookEmail }: Connec
           )}
         </div>
       )}
+      */}
     </div>
   );
 }

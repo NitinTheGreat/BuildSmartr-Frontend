@@ -130,7 +130,7 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-[#3c3f45] rounded-lg transition-colors"
+              className="p-2 hover:bg-[#1e293b] rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
@@ -151,7 +151,7 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
                   onChange={(e) => setEmailInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendEmail()}
                   placeholder="Enter email address"
-                  className="flex-1 bg-[#2b2d31] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="flex-1 bg-[#111827] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 <Button
                   onClick={handleSendEmail}
@@ -183,7 +183,7 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
             {/* WhatsApp */}
             <button
               onClick={handleWhatsAppShare}
-              className="w-full flex items-center gap-4 p-4 bg-[#2b2d31] hover:bg-[#3c3f45] rounded-lg border border-border transition-colors"
+              className="w-full flex items-center gap-4 p-4 bg-[#111827] hover:bg-[#1e293b] rounded-lg border border-border transition-colors"
             >
               <div className="p-2 bg-[#25D366]/20 rounded-lg">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#25D366">
@@ -200,13 +200,13 @@ export function ShareIIVYModal({ isOpen, onClose, userName }: ShareIIVYModalProp
             <div className="pt-2 border-t border-border">
               <p className="text-sm font-medium text-foreground mb-2">Or copy link</p>
               <div className="flex gap-2">
-                <div className="flex-1 bg-[#2b2d31] border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground truncate">
+                <div className="flex-1 bg-[#111827] border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground truncate">
                   {shareUrl}
                 </div>
                 <Button
                   onClick={handleCopyLink}
                   variant="outline"
-                  className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+                  className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
                 >
                   {copied ? (
                     <>

@@ -406,7 +406,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleBackToProject}
-                  className="p-2 hover:bg-[#3c3f45] rounded-lg transition-colors"
+                  className="p-2 hover:bg-[#1e293b] rounded-lg transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                 </button>
@@ -419,7 +419,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditFilesModalOpen(true)}
-                className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+                className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
               >
                 <FileEdit className="w-4 h-4" />
                 Edit Files
@@ -442,7 +442,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                       max-w-[80%] px-4 py-3 rounded-2xl
                       ${message.role === 'user'
                         ? 'bg-accent text-background rounded-br-md'
-                        : 'bg-[#2b2d31] text-foreground rounded-bl-md'
+                        : 'bg-[#111827] text-foreground rounded-bl-md'
                       }
                     `}
                   >
@@ -532,7 +532,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex justify-start"
                 >
-                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-[#2b2d31] text-foreground rounded-bl-md">
+                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-[#111827] text-foreground rounded-bl-md">
                     {/* Thinking status */}
                     {thinkingStatus && !streamedContent && (
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -644,7 +644,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                           className={`flex items-center gap-1 p-1.5 rounded-lg transition-colors ${
                             selectedModes.length > 0 
                               ? 'text-accent bg-accent/10' 
-                              : 'text-muted-foreground hover:text-foreground hover:bg-[#3c3f45]'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-[#1e293b]'
                           }`}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
@@ -660,7 +660,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: 10, scale: 0.95 }}
                               transition={{ duration: 0.15 }}
-                              className="absolute right-0 bottom-full mb-2 bg-[#2b2d31] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
+                              className="absolute right-0 bottom-full mb-2 bg-[#111827] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
                             >
                               {searchModeOptions.map((option) => {
                                 const Icon = option.icon
@@ -681,7 +681,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                                         ? 'bg-accent/20 text-accent' 
                                         : isDisabled 
                                           ? 'text-muted-foreground/50 cursor-not-allowed'
-                                          : 'text-foreground hover:bg-[#3c3f45]'
+                                          : 'text-foreground hover:bg-[#1e293b]'
                                       }
                                     `}
                                   >
@@ -794,10 +794,10 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                   }}
                   className="bg-[#1f2121] border border-border rounded-lg px-3 py-2 text-2xl font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                 />
-                <button onClick={handleSaveName} className="p-2 hover:bg-[#3c3f45] rounded-lg">
+                <button onClick={handleSaveName} className="p-2 hover:bg-[#1e293b] rounded-lg">
                   <Check className="w-5 h-5 text-green-400" />
                 </button>
-                <button onClick={handleCancelEditName} className="p-2 hover:bg-[#3c3f45] rounded-lg">
+                <button onClick={handleCancelEditName} className="p-2 hover:bg-[#1e293b] rounded-lg">
                   <X className="w-5 h-5 text-red-400" />
                 </button>
               </div>
@@ -806,14 +806,14 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 <h1 className="text-3xl font-bold text-foreground">{project.name}</h1>
                 <button
                   onClick={() => setIsEditingName(true)}
-                  className="p-2 hover:bg-[#3c3f45] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-2 hover:bg-[#1e293b] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <Pencil className="w-4 h-4 text-muted-foreground" />
                 </button>
                 {/* SHARE FEATURE DISABLED
                 <button 
                   onClick={() => setIsShareModalOpen(true)}
-                  className="p-2 hover:bg-[#3c3f45] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-2 hover:bg-[#1e293b] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                   title="Share project"
                 >
                   <Share2 className="w-4 h-4 text-muted-foreground" />
@@ -838,10 +838,10 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 placeholder="Add a description..."
               />
               <div className="flex justify-center gap-2">
-                <button onClick={handleCancelEditDescription} className="p-2 hover:bg-[#3c3f45] rounded-lg">
+                <button onClick={handleCancelEditDescription} className="p-2 hover:bg-[#1e293b] rounded-lg">
                   <X className="w-4 h-4 text-red-400" />
                 </button>
-                <button onClick={handleSaveDescription} className="p-2 hover:bg-[#3c3f45] rounded-lg">
+                <button onClick={handleSaveDescription} className="p-2 hover:bg-[#1e293b] rounded-lg">
                   <Check className="w-4 h-4 text-green-400" />
                 </button>
               </div>
@@ -877,7 +877,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsShareModalOpen(true)}
-                className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+                className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
               >
                 <Share2 className="w-4 h-4" />
                 Share
@@ -887,7 +887,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditFilesModalOpen(true)}
-                className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+                className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
               >
                 <FileEdit className="w-4 h-4" />
                 Edit Files
@@ -901,8 +901,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 <div
                   key={file.id}
                   onClick={() => handleFileClick(file)}
-                  className={`flex items-center gap-2 px-3 py-2 bg-[#2b2d31] border border-border rounded-lg ${isPreviewable(file)
-                    ? 'cursor-pointer hover:bg-[#3c3f45] hover:border-accent/50 transition-colors'
+                  className={`flex items-center gap-2 px-3 py-2 bg-[#111827] border border-border rounded-lg ${isPreviewable(file)
+                    ? 'cursor-pointer hover:bg-[#1e293b] hover:border-accent/50 transition-colors'
                     : ''
                     }`}
                   title={isPreviewable(file) ? 'Click to preview' : undefined}
@@ -916,7 +916,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               ))}
             </div>
           ) : (
-            <div className="text-center py-6 bg-[#2b2d31] border border-dashed border-border rounded-lg">
+            <div className="text-center py-6 bg-[#111827] border border-dashed border-border rounded-lg">
               <p className="text-sm text-muted-foreground">No files added yet</p>
               <Button
                 variant="ghost"
@@ -940,21 +940,21 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-[#2b2d31] border border-border rounded-lg p-4 text-center">
+              <div className="bg-[#111827] border border-border rounded-lg p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <MessageSquare className="w-5 h-5 text-accent" />
                 </div>
                 <p className="text-xl font-semibold text-foreground">{indexingStats.thread_count || 0}</p>
                 <p className="text-xs text-muted-foreground">Conversations</p>
               </div>
-              <div className="bg-[#2b2d31] border border-border rounded-lg p-4 text-center">
+              <div className="bg-[#111827] border border-border rounded-lg p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Mail className="w-5 h-5 text-accent" />
                 </div>
                 <p className="text-xl font-semibold text-foreground">{indexingStats.message_count || 0}</p>
                 <p className="text-xs text-muted-foreground">Messages</p>
               </div>
-              <div className="bg-[#2b2d31] border border-border rounded-lg p-4 text-center">
+              <div className="bg-[#111827] border border-border rounded-lg p-4 text-center">
                 <div className="flex items-center justify-center mb-2">
                   <Paperclip className="w-5 h-5 text-accent" />
                 </div>
@@ -975,7 +975,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               variant="outline"
               size="sm"
               onClick={handleNewChat}
-              className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+              className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
             >
               <Plus className="w-4 h-4" />
               New Chat
@@ -988,7 +988,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 <div
                   key={chat.id}
                   onClick={() => handleSelectChat(chat.id)}
-                  className="flex items-center justify-between p-3 bg-[#2b2d31] border border-border rounded-lg cursor-pointer hover:bg-[#3c3f45] transition-colors group"
+                  className="flex items-center justify-between p-3 bg-[#111827] border border-border rounded-lg cursor-pointer hover:bg-[#1e293b] transition-colors group"
                 >
                   <div className="flex items-center gap-3">
                     <MessageSquare className="w-5 h-5 text-accent" />
@@ -1001,7 +1001,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                   </div>
                   <button
                     onClick={(e) => handleDeleteChat(chat.id, e)}
-                    className="p-2 hover:bg-[#4a4d52] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-2 hover:bg-[#334155] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-400" />
                   </button>

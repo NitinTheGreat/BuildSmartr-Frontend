@@ -84,10 +84,10 @@ export function PDFPreviewModal({ isOpen, onClose, file }: PDFPreviewModalProps)
 
           <div className="flex items-center gap-2">
             {/* Zoom controls */}
-            <div className="flex items-center gap-1 bg-[#2b2d31] rounded-lg p-1">
+            <div className="flex items-center gap-1 bg-[#111827] rounded-lg p-1">
               <button
                 onClick={handleZoomOut}
-                className="p-1.5 hover:bg-[#3c3f45] rounded transition-colors"
+                className="p-1.5 hover:bg-[#1e293b] rounded transition-colors"
                 title="Zoom out"
               >
                 <ZoomOut className="w-4 h-4 text-muted-foreground" />
@@ -97,7 +97,7 @@ export function PDFPreviewModal({ isOpen, onClose, file }: PDFPreviewModalProps)
               </span>
               <button
                 onClick={handleZoomIn}
-                className="p-1.5 hover:bg-[#3c3f45] rounded transition-colors"
+                className="p-1.5 hover:bg-[#1e293b] rounded transition-colors"
                 title="Zoom in"
               >
                 <ZoomIn className="w-4 h-4 text-muted-foreground" />
@@ -107,7 +107,7 @@ export function PDFPreviewModal({ isOpen, onClose, file }: PDFPreviewModalProps)
             {/* Rotate */}
             <button
               onClick={handleRotate}
-              className="p-2 hover:bg-[#3c3f45] rounded-lg transition-colors"
+              className="p-2 hover:bg-[#1e293b] rounded-lg transition-colors"
               title="Rotate"
             >
               <RotateCw className="w-4 h-4 text-muted-foreground" />
@@ -119,7 +119,7 @@ export function PDFPreviewModal({ isOpen, onClose, file }: PDFPreviewModalProps)
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
-                className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+                className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
               >
                 <Download className="w-4 h-4" />
                 Download
@@ -129,7 +129,7 @@ export function PDFPreviewModal({ isOpen, onClose, file }: PDFPreviewModalProps)
             {/* Close */}
             <button
               onClick={onClose}
-              className="p-2 hover:bg-[#3c3f45] rounded-lg transition-colors"
+              className="p-2 hover:bg-[#1e293b] rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
@@ -160,7 +160,7 @@ export function PDFPreviewModal({ isOpen, onClose, file }: PDFPreviewModalProps)
                 <Button
                   variant="outline"
                   onClick={handleDownload}
-                  className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+                  className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
                 >
                   <Download className="w-4 h-4" />
                   Download instead
@@ -212,7 +212,7 @@ export function PDFPreviewModal({ isOpen, onClose, file }: PDFPreviewModalProps)
                 <Button
                   variant="outline"
                   onClick={handleDownload}
-                  className="bg-transparent border-border hover:bg-[#3c3f45] gap-2"
+                  className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
                 >
                   <Download className="w-4 h-4" />
                   Download file

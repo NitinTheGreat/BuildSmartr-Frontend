@@ -66,9 +66,9 @@ export function ProjectLoadingScreen() {
           className="absolute inset-0 rounded-2xl"
           animate={{
             boxShadow: [
-              "0 0 0 0 rgba(0, 210, 211, 0)",
-              "0 0 30px 10px rgba(0, 210, 211, 0.15)",
-              "0 0 0 0 rgba(0, 210, 211, 0)",
+              "0 0 0 0 rgba(34, 197, 94, 0)",
+              "0 0 30px 10px rgba(34, 197, 94, 0.15)",
+              "0 0 0 0 rgba(34, 197, 94, 0)",
             ],
           }}
           transition={{

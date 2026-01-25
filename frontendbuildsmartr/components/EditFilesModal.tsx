@@ -206,7 +206,7 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
               <button
                 type="button"
                 onClick={() => removeFile(category)}
-                className="p-1 hover:bg-[#3c3f45] rounded transition-colors flex-shrink-0"
+                className="p-1 hover:bg-[#1e293b] rounded transition-colors flex-shrink-0"
               >
                 <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-400" />
               </button>
@@ -260,7 +260,7 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-[#2b2d31] border border-border rounded-xl shadow-2xl z-50 overflow-hidden safe-area-all"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-[#111827] border border-border rounded-xl shadow-2xl z-50 overflow-hidden safe-area-all"
             style={{
               paddingTop: 'env(safe-area-inset-top, 0px)',
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -273,7 +273,7 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
               <h2 className="text-lg font-semibold text-foreground">Edit Files</h2>
               <button
                 onClick={handleClose}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#3c3f45] transition-colors"
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#1e293b] transition-colors"
               >
                 <X className="w-5 h-5 text-muted-foreground" />
               </button>
@@ -301,7 +301,7 @@ export function EditFilesModal({ isOpen, onClose, projectId, currentFiles }: Edi
                   variant="outline"
                   onClick={handleClose}
                   disabled={isSaving}
-                  className="bg-transparent border-border hover:bg-[#3c3f45]"
+                  className="bg-transparent border-border hover:bg-[#1e293b]"
                 >
                   Cancel
                 </Button>

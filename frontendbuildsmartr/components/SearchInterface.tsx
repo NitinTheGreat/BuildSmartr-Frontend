@@ -193,7 +193,7 @@ export function SearchInterface() {
                   className={`flex items-center gap-1 p-1.5 rounded-lg transition-colors ${
                     selectedModes.length > 0 
                       ? 'text-accent bg-accent/10' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-[#3c3f45]'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-[#1e293b]'
                   }`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -209,7 +209,7 @@ export function SearchInterface() {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute right-0 bottom-full mb-2 bg-[#2b2d31] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
+                      className="absolute right-0 bottom-full mb-2 bg-[#111827] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
                     >
                       {searchModeOptions.map((option) => {
                         const Icon = option.icon
@@ -230,7 +230,7 @@ export function SearchInterface() {
                                 ? 'bg-accent/20 text-accent' 
                                 : isDisabled 
                                   ? 'text-muted-foreground/50 cursor-not-allowed'
-                                  : 'text-foreground hover:bg-[#3c3f45]'
+                                  : 'text-foreground hover:bg-[#1e293b]'
                               }
                             `}
                           >

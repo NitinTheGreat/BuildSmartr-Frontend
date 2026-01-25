@@ -128,7 +128,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             {!isMobileOpen && (
               <button
                 onClick={() => setIsExpanded(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#3c3f45] transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#1e293b] transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
                 aria-label="Collapse sidebar"
               >
                 <PanelLeftClose className="w-4 h-4" />
@@ -152,7 +152,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 e.stopPropagation()
                 setIsExpanded(true)
               }}
-              className="absolute -right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md bg-[#3c3f45] flex items-center justify-center opacity-0 invisible group-hover/logo:opacity-100 group-hover/logo:visible transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-[#4a4d52] z-10"
+              className="absolute -right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md bg-[#1e293b] flex items-center justify-center opacity-0 invisible group-hover/logo:opacity-100 group-hover/logo:visible transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-[#334155] z-10"
               aria-label="Expand sidebar"
             >
               <PanelLeft className="w-3 h-3" />
@@ -170,7 +170,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
               whileTap={{ scale: 0.98 }}
               className={`
                 flex items-center ${isExpandedView ? 'justify-start gap-3 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors
-                ${pathname === '/chat' ? 'bg-accent text-background' : 'bg-[#3c3f45] hover:bg-[#4a4d52] text-foreground'}
+                ${pathname === '/chat' ? 'bg-accent text-background' : 'bg-[#1e293b] hover:bg-[#334155] text-foreground'}
               `}
             >
               <Plus className="w-4 h-4 flex-shrink-0" />
@@ -190,7 +190,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#3c3f45] border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
+              className="w-full bg-[#1e293b] border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent"
             />
           </div>
         </div>
@@ -206,7 +206,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             onClick={() => setIsNewProjectModalOpen(true)}
             className={`
               flex items-center ${isExpandedView ? 'justify-start gap-3 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors 
-              bg-transparent border border-dashed border-border hover:border-accent hover:bg-[#3c3f45]/50 text-muted-foreground hover:text-foreground w-full mb-3
+              bg-transparent border border-dashed border-border hover:border-accent hover:bg-[#1e293b]/50 text-muted-foreground hover:text-foreground w-full mb-3
             `}
           >
             <FolderOpen className="w-4 h-4 flex-shrink-0" />
@@ -261,7 +261,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                             flex flex-col ${isExpandedView ? 'gap-1 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
                             ${isCurrentProject
                               ? 'bg-accent/20 text-foreground'
-                              : 'hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground'
+                              : 'hover:bg-[#1e293b] text-muted-foreground hover:text-foreground'
                             }
                           `}
                         >
@@ -337,7 +337,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => handleChatClick(project.id, chat.id)}
-                                className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground"
+                                className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors hover:bg-[#1e293b] text-muted-foreground hover:text-foreground"
                               >
                                 <MessageSquare className="w-3 h-3 flex-shrink-0" />
                                 <span className="text-xs truncate">{chat.title}</span>
@@ -371,7 +371,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                       }}
                       className={`
                         flex items-center ${isExpandedView ? 'gap-2 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors group
-                        hover:bg-[#3c3f45] text-muted-foreground hover:text-foreground
+                        hover:bg-[#1e293b] text-muted-foreground hover:text-foreground
                       `}
                     >
                       <MessageSquare className="w-4 h-4 flex-shrink-0" />
@@ -391,7 +391,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
         <div className="relative group/profile">
           <Link href="/account" onClick={closeMobileMenu}>
             <motion.div
-              whileHover={{ backgroundColor: "#3c3f45" }}
+              whileHover={{ backgroundColor: "#1e293b" }}
               whileTap={{ scale: 0.98 }}
               className={`
                 flex items-center ${isExpandedView ? 'gap-3 px-2' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-colors
@@ -418,7 +418,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             className={`
               absolute opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-150
               ${isExpandedView ? 'left-0 right-0 bottom-full mb-1' : 'left-full top-1/2 -translate-y-1/2 ml-2'}
-              bg-[#2b2d31] border border-border rounded-lg shadow-lg py-1 min-w-[120px] z-[60]
+              bg-[#0d1117] border border-border rounded-lg shadow-lg py-1 min-w-[120px] z-[60]
             `}
           >
             <button
@@ -426,7 +426,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                 handleLogout()
                 closeMobileMenu()
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-[#3c3f45] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-[#1e293b] transition-colors"
             >
               <LogOut className="w-4 h-4" />
               Logout
@@ -448,7 +448,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
       {/* Mobile Hamburger Button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="fixed z-50 md:hidden w-11 h-11 rounded-xl bg-[#2b2d31]/95 backdrop-blur-sm flex items-center justify-center shadow-lg border border-border/50 transition-all duration-200 hover:bg-[#3c3f45] active:scale-95"
+        className="fixed z-50 md:hidden w-11 h-11 rounded-xl bg-[#0d1117]/95 backdrop-blur-sm flex items-center justify-center shadow-lg border border-border/50 transition-all duration-200 hover:bg-[#1e293b] active:scale-95"
         style={{
           top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
           left: 'calc(env(safe-area-inset-left, 0px) + 12px)'
@@ -480,7 +480,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-0 top-0 h-screen w-[280px] max-w-[85vw] bg-[#2b2d31] flex flex-col z-50 md:hidden overflow-x-hidden shadow-2xl"
+            className="fixed left-0 top-0 h-screen w-[280px] max-w-[85vw] bg-[#0d1117] flex flex-col z-50 md:hidden overflow-x-hidden shadow-2xl"
             style={{
               paddingTop: 'env(safe-area-inset-top, 0px)',
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -490,7 +490,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
             {/* Close Button */}
             <button
               onClick={closeMobileMenu}
-              className="absolute top-3 right-3 w-9 h-9 rounded-lg bg-transparent flex items-center justify-center hover:bg-[#3c3f45] transition-colors z-10"
+              className="absolute top-3 right-3 w-9 h-9 rounded-lg bg-transparent flex items-center justify-center hover:bg-[#1e293b] transition-colors z-10"
               style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
               aria-label="Close menu"
             >
@@ -505,7 +505,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#2b2d31] flex-col z-50 transition-all duration-300 ease-out overflow-y-auto ${isExpanded ? 'w-64' : 'w-20'
+        className={`hidden md:flex fixed left-0 top-0 h-screen bg-[#0d1117] flex-col z-50 transition-all duration-300 ease-out overflow-y-auto ${isExpanded ? 'w-64' : 'w-20'
           }`}
         style={{
           overflow: isExpanded ? 'hidden auto' : 'visible',

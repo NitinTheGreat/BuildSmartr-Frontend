@@ -11,7 +11,7 @@ export function Skeleton({
     className?: string
     variant?: "default" | "circular" | "rounded"
 }) {
-    const baseClasses = "bg-[#2b2d31] relative overflow-hidden"
+    const baseClasses = "bg-[#111827] relative overflow-hidden"
     const variantClasses = {
         default: "rounded",
         circular: "rounded-full",
@@ -21,7 +21,7 @@ export function Skeleton({
     return (
         <div className={`${baseClasses} ${variantClasses[variant]} ${className}`}>
             <motion.div
-                className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#3c3f45]/50 to-transparent"
+                className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#1e293b]/50 to-transparent"
                 animate={{ translateX: ["100%", "100%"] }}
                 transition={{
                     duration: 1.5,
@@ -32,7 +32,7 @@ export function Skeleton({
                 style={{ translateX: "-100%" }}
             />
             <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-[#3c3f45]/30 to-transparent"
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-[#1e293b]/30 to-transparent"
                 animate={{ x: ["-100%", "100%"] }}
                 transition={{
                     duration: 1.5,
@@ -155,9 +155,9 @@ export function HomepageSkeleton() {
                         className="absolute inset-0 rounded-2xl"
                         animate={{
                             boxShadow: [
-                                "0 0 0 0 rgba(0, 210, 211, 0)",
-                                "0 0 25px 8px rgba(0, 210, 211, 0.12)",
-                                "0 0 0 0 rgba(0, 210, 211, 0)",
+                                "0 0 0 0 rgba(34, 197, 94, 0)",
+                                "0 0 25px 8px rgba(34, 197, 94, 0.12)",
+                                "0 0 0 0 rgba(34, 197, 94, 0)",
                             ],
                         }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -285,9 +285,9 @@ export function ProjectSkeleton() {
                         className="absolute inset-0 rounded-2xl"
                         animate={{
                             boxShadow: [
-                                "0 0 0 0 rgba(0, 210, 211, 0)",
-                                "0 0 20px 6px rgba(0, 210, 211, 0.1)",
-                                "0 0 0 0 rgba(0, 210, 211, 0)",
+                                "0 0 0 0 rgba(34, 197, 94, 0)",
+                                "0 0 20px 6px rgba(34, 197, 94, 0.1)",
+                                "0 0 0 0 rgba(34, 197, 94, 0)",
                             ],
                         }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -309,7 +309,7 @@ export function ProjectSkeleton() {
                             <span className="text-sm font-medium">{messages[messageIndex].text}</span>
                         </motion.div>
                     </AnimatePresence>
-                </div>
+            </div>
 
                 {/* Progress bar */}
                 <div className="w-48 mx-auto mb-6">
@@ -320,8 +320,8 @@ export function ProjectSkeleton() {
                             animate={{ width: `${progress}%` }}
                             transition={{ duration: 0.3, ease: "easeOut" }}
                         />
-                    </div>
                 </div>
+            </div>
 
                 {/* Loading dots */}
                 <div className="flex justify-center gap-1.5">
@@ -386,7 +386,7 @@ export function ChatSkeleton() {
 
                     {/* Loading indicator */}
                     <div className="flex justify-start">
-                        <div className="flex items-center gap-3 px-4 py-3 bg-[#2b2d31] rounded-2xl">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-[#111827] rounded-2xl">
                             <div className="flex gap-1">
                                 {[0, 1, 2].map((i) => (
                                     <motion.div
@@ -500,12 +500,12 @@ export function EmptyStateSkeleton() {
             transition={{ duration: 0.4 }}
         >
             <motion.div
-                className="w-24 h-24 bg-[#2b2d31] rounded-2xl mb-6 flex items-center justify-center"
+                className="w-24 h-24 bg-[#111827] rounded-2xl mb-6 flex items-center justify-center"
                 animate={{
                     boxShadow: [
-                        "0 0 0 0 rgba(0, 210, 211, 0)",
-                        "0 0 0 20px rgba(0, 210, 211, 0.1)",
-                        "0 0 0 0 rgba(0, 210, 211, 0)"
+                        "0 0 0 0 rgba(34, 197, 94, 0)",
+                        "0 0 0 20px rgba(34, 197, 94, 0.1)",
+                        "0 0 0 0 rgba(34, 197, 94, 0)"
                     ]
                 }}
                 transition={{ duration: 2, repeat: Infinity }}

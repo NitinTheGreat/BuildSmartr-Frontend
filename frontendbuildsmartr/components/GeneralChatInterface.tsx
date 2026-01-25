@@ -292,7 +292,7 @@ export function GeneralChatInterface() {
                   max-w-[80%] px-4 py-3 rounded-2xl
                   ${message.role === 'user'
                     ? 'bg-accent text-background rounded-br-md'
-                    : 'bg-[#2b2d31] text-foreground rounded-bl-md'
+                    : 'bg-[#111827] text-foreground rounded-bl-md'
                   }
                 `}
               >
