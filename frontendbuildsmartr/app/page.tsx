@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server";
+import { getUser, getSession } from "@/utils/supabase/server";
 import { Suspense } from "react";
 import Image from "next/image";
 import AuthButtons from "@/components/AuthButtons";
@@ -6,20 +6,50 @@ import AuthStateListener from "@/components/AuthStateListener";
 import { GeneralChatInterface } from "@/components/GeneralChatInterface";
 import { HomepageSkeleton } from "@/components/ui/skeletons";
 import logo from "@/public/logo.png";
+import type { Project } from "@/types/project";
+import type { ProjectResponse } from "@/types/api";
+import { toProject } from "@/lib/api";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071";
+
+// Server-side prefetch of projects
+async function prefetchProjects(accessToken: string): Promise<Project[]> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/projects`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      // Next.js 16 caching
+      next: { revalidate: 60 }, // Cache for 60 seconds
+    });
+
+    if (!response.ok) return [];
+
+    const data: ProjectResponse[] = await response.json();
+    return data.map(toProject);
+  } catch (error) {
+    console.error("[page.tsx] Failed to prefetch projects:", error);
+    return [];
+  }
+}
 
 export default async function Page() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Use cached auth helper (deduplicates calls across components)
+  const { user } = await getUser();
 
   console.log("[page.tsx] user:", user?.email ?? "not authenticated");
 
-  // Authenticated users see  dashboard with projects
+  // Authenticated users see dashboard with projects
   if (user) {
+    // Get session for access token
+    const { session } = await getSession();
+
+    // Prefetch projects on server (faster initial load)
+    const initialProjects = session?.access_token
+      ? await prefetchProjects(session.access_token)
+      : [];
+
     return (
       <Suspense fallback={<HomepageSkeleton />}>
-        <GeneralChatInterface />
+        <GeneralChatInterface initialProjects={initialProjects} />
       </Suspense>
     );
   }

@@ -1,5 +1,5 @@
-import { createClient } from "@/utils/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
+import { getSession } from "@/utils/supabase/server"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071"
 
@@ -7,9 +7,9 @@ interface RouteParams {
   params: Promise<{ project_id: string; file_id: string }>
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+// Special handling for file downloads (binary streaming, not JSON)
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  const { session } = await getSession()
 
   if (!session?.access_token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

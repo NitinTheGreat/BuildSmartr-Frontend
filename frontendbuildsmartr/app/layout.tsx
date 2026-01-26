@@ -1,15 +1,15 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
-// import { Analytics } from "@vercel/analytics/next"
 import { Sidebar } from "@/components/Sidebar"
 import { TopBar } from "@/components/TopBar"
-import { createClient } from "@/utils/supabase/server"
+import { getUser } from "@/utils/supabase/server"
 import { ProjectProvider } from "@/contexts/ProjectContext"
 import { IndexingProvider } from "@/contexts/IndexingContext"
 import { FloatingProgressIndicator } from "@/components/FloatingProgressIndicator"
 import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -80,17 +80,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Use cached auth helper (deduplicates calls across the request)
+  const { user } = await getUser()
 
   const avatarUrl = (user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture ?? null) as string | null
   const fullName = (user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? null) as string | null
   const firstName = fullName?.split(" ")[0] ?? null
-
-  console.log("[layout] full user object:", JSON.stringify(user, null, 2))
-  console.log("[layout] avatarUrl:", avatarUrl)
 
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>

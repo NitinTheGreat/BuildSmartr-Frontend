@@ -1,65 +1,55 @@
-"use client"
+import { getSession } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { ProjectSkeleton } from "@/components/ui/skeletons";
+import { ProjectPageClient } from "./ProjectPageClient";
+import type { Project } from "@/types/project";
+import type { ProjectResponse } from "@/types/api";
+import { toProject } from "@/lib/api";
 
-import { useEffect, useState, useRef } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { useProjects } from "@/contexts/ProjectContext"
-import { ProjectChatInterface } from "@/components/ProjectChatInterface"
-import { ProjectSkeleton } from "@/components/ui/skeletons"
-import { motion } from "framer-motion"
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071";
 
-export default function ProjectPage() {
-  const params = useParams()
-  const router = useRouter()
-  const { projects, currentProject, setCurrentProject, loadProject, isLoading: isContextLoading } = useProjects()
-  const [isPageLoading, setIsPageLoading] = useState(true)
-  const hasLoadedRef = useRef(false)
-  const projectId = params.id as string
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    // Prevent duplicate loads
-    if (hasLoadedRef.current) return
+// Server-side prefetch of project details
+async function prefetchProject(accessToken: string, projectId: string): Promise<Project | null> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/projects/${projectId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      // Next.js caching
+      next: { revalidate: 60 },
+    });
+    
+    if (!response.ok) return null;
+    
+    const data: ProjectResponse = await response.json();
+    return toProject(data);
+  } catch (error) {
+    console.error("[project/page.tsx] Failed to prefetch project:", error);
+    return null;
+  }
+}
 
-    const initializeProject = async () => {
-      // Check if we already have this project in the list
-      const existingProject = projects.find(p => p.id === projectId)
-      
-      // If context is still doing initial load and we don't have the project yet, wait
-      if (isContextLoading && !existingProject) {
-        return
-      }
+export default async function ProjectPage({ params }: PageProps) {
+  const { id: projectId } = await params;
+  const { session } = await getSession();
 
-      hasLoadedRef.current = true
-      setIsPageLoading(true)
-
-      // Load full project details (including files and chats)
-      const fullProject = await loadProject(projectId)
-
-      if (fullProject) {
-        setCurrentProject(fullProject)
-      } else {
-        // Project not found, redirect to home
-        router.push('/')
-        return
-      }
-
-      setIsPageLoading(false)
-    }
-
-    initializeProject()
-  }, [projectId, projects, isContextLoading, loadProject, setCurrentProject, router])
-
-  // Show loading state with enhanced skeleton
-  if (isPageLoading || !currentProject || currentProject.id !== projectId) {
-    return <ProjectSkeleton />
+  // Redirect to login if not authenticated
+  if (!session?.access_token) {
+    redirect("/");
   }
 
+  // Prefetch project on server
+  const initialProject = await prefetchProject(session.access_token, projectId);
+
+  // If project not found on server, let client handle the redirect
+  // (in case it's a newly created project not yet synced)
+  
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <ProjectChatInterface project={currentProject} />
-    </motion.div>
-  )
+    <Suspense fallback={<ProjectSkeleton />}>
+      <ProjectPageClient projectId={projectId} initialProject={initialProject} />
+    </Suspense>
+  );
 }

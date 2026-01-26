@@ -2,17 +2,22 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { FolderPlus, FolderOpen, ArrowRight, MessageSquare } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
-import type { SearchMode } from "@/types/project"
+import type { Project, SearchMode } from "@/types/project"
 import { NewProjectModal } from "./NewProjectModal"
 import { createClient } from "@/utils/supabase/client"
 import { HomepageSkeleton } from "@/components/ui/skeletons"
 
-export function GeneralChatInterface() {
+interface GeneralChatInterfaceProps {
+  /** Initial projects from server-side prefetch for instant render */
+  initialProjects?: Project[]
+}
+
+export function GeneralChatInterface({ initialProjects }: GeneralChatInterfaceProps) {
   const [query, setQuery] = useState("")
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -25,7 +30,7 @@ export function GeneralChatInterface() {
   const router = useRouter()
 
   const {
-    projects,
+    projects: contextProjects,
     generalChats,
     currentGeneralChatId,
     createGeneralChat,
@@ -34,6 +39,10 @@ export function GeneralChatInterface() {
     setCurrentProject,
     isLoading: isProjectsLoading,
   } = useProjects()
+
+  // Use initial projects immediately if context hasn't loaded yet
+  const projects = contextProjects.length > 0 ? contextProjects : (initialProjects || [])
+  const hasInitialData = initialProjects && initialProjects.length > 0
 
   const currentChat = generalChats.find(c => c.id === currentGeneralChatId)
   const messages = currentChat?.messages || []
@@ -132,8 +141,8 @@ export function GeneralChatInterface() {
     }
   }
 
-  // Show loading screen while projects are being loaded
-  if (isProjectsLoading && projects.length === 0) {
+  // Show loading screen only if we don't have initial data and context is still loading
+  if (isProjectsLoading && !hasInitialData && projects.length === 0) {
     return <HomepageSkeleton />
   }
 
