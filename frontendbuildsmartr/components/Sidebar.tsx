@@ -350,7 +350,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                                       e.stopPropagation()
                                       setProjectMenuOpen(projectMenuOpen === project.id ? null : project.id)
                                     }}
-                                    className="p-1 rounded hover:bg-[#334155] opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="p-1 rounded hover:bg-[#334155] text-muted-foreground hover:text-foreground transition-colors"
                                   >
                                     <MoreVertical className="w-4 h-4" />
                                   </button>
