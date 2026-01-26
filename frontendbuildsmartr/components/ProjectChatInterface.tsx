@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
-import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip } from "lucide-react"
+import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip, MoreVertical, Ban, Loader2 } from "lucide-react"
 import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile } from "@/types/project"
 import { EditFilesModal } from "./EditFilesModal"
 import { ShareProjectModal } from "./ShareProjectModal"
@@ -14,6 +14,7 @@ import { PDFPreviewModal } from "./PDFPreviewModal"
 import { useProjects } from "@/contexts/ProjectContext"
 import { useIndexing } from "@/contexts/IndexingContext"
 import { useStreamingSearch } from "@/hooks/useStreamingSearch"
+import { useRouter } from "next/navigation"
 
 interface SearchModeOption {
   id: SearchMode
@@ -45,6 +46,9 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   // Optimistic message - shown immediately when user sends
   const [optimisticMessage, setOptimisticMessage] = useState<{ content: string; searchModes?: SearchMode[] } | null>(null)
   // Message queue - messages waiting to be processed
@@ -56,6 +60,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const nameInputRef = useRef<HTMLInputElement>(null)
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const settingsRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   const {
     currentChatId,
@@ -65,10 +71,11 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     addMessageToChat,
     updateChatTitle,
     deleteChat,
-    updateProject
+    updateProject,
+    deleteProject
   } = useProjects()
 
-  const { indexingStates } = useIndexing()
+  const { indexingStates, cancelIndexing, dismissIndexing } = useIndexing()
   const projectIndexingState = indexingStates[project.id]
   const indexingStats = projectIndexingState?.stats
 
@@ -128,6 +135,9 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsDropdownOpen(false)
+      }
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setIsSettingsOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -209,6 +219,30 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     await deleteChat(project.id, chatId)
+  }
+
+  // Handle delete project
+  const handleDeleteProject = async () => {
+    setIsDeleting(true)
+    try {
+      // Cancel any active indexing first
+      if (indexingStates[project.id]) {
+        dismissIndexing(project.id)
+      }
+      await deleteProject(project.id)
+      router.push('/')
+    } catch (error) {
+      console.error('Failed to delete project:', error)
+    } finally {
+      setIsDeleting(false)
+      setDeleteConfirm(false)
+    }
+  }
+
+  // Handle cancel sync
+  const handleCancelSync = async () => {
+    setIsSettingsOpen(false)
+    await cancelIndexing(project.id)
   }
 
   // Process a single message - handles backend communication
@@ -805,6 +839,47 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 >
                   <Pencil className="w-4 h-4 text-muted-foreground" />
                 </button>
+                {/* Settings Menu */}
+                <div className="relative" ref={settingsRef}>
+                  <button
+                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                    className="p-2 hover:bg-[#1e293b] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <AnimatePresence>
+                    {isSettingsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        className="absolute right-0 top-full mt-1 bg-[#0d1117] border border-border rounded-lg shadow-xl py-1 min-w-[160px] z-50"
+                      >
+                        {/* Show cancel sync option if project is indexing */}
+                        {(projectIndexingState?.status === 'indexing' || 
+                          projectIndexingState?.status === 'vectorizing') && (
+                          <button
+                            onClick={handleCancelSync}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
+                          >
+                            <Ban className="w-4 h-4" />
+                            Cancel Sync
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setIsSettingsOpen(false)
+                            setDeleteConfirm(true)
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-[#1e293b] transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete Project
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
                 {/* SHARE FEATURE DISABLED
                 <button 
                   onClick={() => setIsShareModalOpen(true)}
@@ -1048,6 +1123,64 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           </form>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[100]"
+              onClick={() => !isDeleting && setDeleteConfirm(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-[#111827] border border-border rounded-xl shadow-2xl z-[101] p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Delete Project</h3>
+                  <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                Are you sure you want to delete <span className="text-foreground font-medium">&quot;{project.name}&quot;</span>? 
+                All project data, chats, and files will be permanently removed.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(false)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-foreground bg-transparent border border-border rounded-lg hover:bg-[#1e293b] transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteProject}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }

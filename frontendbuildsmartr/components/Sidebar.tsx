@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2 } from "lucide-react"
+import { User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2, Trash2, ExternalLink, XCircle, Ban } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
@@ -25,10 +25,13 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const [isExpanded, setIsExpanded] = useState(false)
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ projectId: string; projectName: string } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
-  const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat, isLoading } = useProjects()
-  const { indexingStates } = useIndexing()
+  const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat, deleteProject, isLoading } = useProjects()
+  const { indexingStates, cancelIndexing, dismissIndexing } = useIndexing()
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -92,6 +95,49 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
       router.push(`/project/${projectId}`)
       closeMobileMenu()
     }
+  }
+
+  // Handle right-click context menu
+  const handleContextMenu = (e: React.MouseEvent, projectId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, projectId })
+  }
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null)
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [contextMenu])
+
+  // Handle delete project
+  const handleDeleteProject = async (projectId: string) => {
+    setIsDeleting(true)
+    try {
+      // Cancel any active indexing first
+      if (indexingStates[projectId]) {
+        dismissIndexing(projectId)
+      }
+      await deleteProject(projectId)
+      setDeleteConfirm(null)
+      // Navigate to home if we deleted the current project
+      if (pathname === `/project/${projectId}`) {
+        router.push('/')
+      }
+    } catch (error) {
+      console.error('Failed to delete project:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Handle cancel sync
+  const handleCancelSync = async (projectId: string) => {
+    setContextMenu(null)
+    await cancelIndexing(projectId)
   }
 
   // Tooltip component for collapsed state
@@ -254,6 +300,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                       <Tooltip label={project.name}>
                         <div
                           onClick={(e) => handleProjectClick(project.id, e)}
+                          onContextMenu={(e) => handleContextMenu(e, project.id)}
                           className={`
                             flex flex-col ${isExpandedView ? 'gap-1 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-all duration-150 active:scale-[0.98] group
                             ${isCurrentProject
@@ -437,6 +484,115 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
         isOpen={isNewProjectModalOpen}
         onClose={() => setIsNewProjectModalOpen(false)}
       />
+
+      {/* Context Menu */}
+      <AnimatePresence>
+        {contextMenu && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+            className="fixed bg-[#0d1117] border border-border rounded-lg shadow-xl py-1 z-[100] min-w-[160px]"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                handleProjectNavigate(contextMenu.projectId)
+                setContextMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-[#1e293b] transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open Project
+            </button>
+            {/* Show cancel sync option if project is indexing */}
+            {(indexingStates[contextMenu.projectId]?.status === 'indexing' || 
+              indexingStates[contextMenu.projectId]?.status === 'vectorizing') && (
+              <button
+                onClick={() => handleCancelSync(contextMenu.projectId)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
+              >
+                <Ban className="w-4 h-4" />
+                Cancel Sync
+              </button>
+            )}
+            <div className="h-px bg-border my-1" />
+            <button
+              onClick={() => {
+                const project = projects.find(p => p.id === contextMenu.projectId)
+                if (project) {
+                  setDeleteConfirm({ projectId: project.id, projectName: project.name })
+                }
+                setContextMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-[#1e293b] transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Project
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[100]"
+              onClick={() => !isDeleting && setDeleteConfirm(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-[#111827] border border-border rounded-xl shadow-2xl z-[101] p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Delete Project</h3>
+                  <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                Are you sure you want to delete <span className="text-foreground font-medium">&quot;{deleteConfirm.projectName}&quot;</span>? 
+                All project data, chats, and files will be permanently removed.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-foreground bg-transparent border border-border rounded-lg hover:bg-[#1e293b] transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteProject(deleteConfirm.projectId)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Mobile Hamburger Button */}
       <button

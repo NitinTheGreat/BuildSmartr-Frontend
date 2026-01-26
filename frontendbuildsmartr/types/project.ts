@@ -74,7 +74,7 @@ export interface Project {
 // ============================================
 
 /** Indexing status values from the backend */
-export type IndexingStatus = 'pending' | 'indexing' | 'vectorizing' | 'completed' | 'error' | 'not_found'
+export type IndexingStatus = 'pending' | 'indexing' | 'vectorizing' | 'completed' | 'error' | 'not_found' | 'cancelling' | 'cancelled'
 
 export interface ProjectIndexingState {
   projectId: string

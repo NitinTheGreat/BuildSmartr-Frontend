@@ -11,6 +11,7 @@ import {
 interface IndexingContextType {
     indexingStates: Record<string, ProjectIndexingState>
     startIndexing: (projectId: string, projectName: string) => Promise<void>
+    cancelIndexing: (projectId: string) => Promise<void>
     updateProgress: (projectId: string, percent: number, step: string, stats?: ProjectIndexingState['stats']) => void
     completeIndexing: (projectId: string, stats?: ProjectIndexingState['stats']) => void
     setError: (projectId: string, error: string) => void
@@ -35,7 +36,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
                 const ONE_HOUR = 60 * 60 * 1000
 
                 for (const [id, state] of Object.entries(states)) {
-                    if (state.status === 'indexing' || state.status === 'vectorizing' || state.status === 'pending') {
+                    if (state.status === 'indexing' || state.status === 'vectorizing' || state.status === 'pending' || state.status === 'cancelling') {
                         if (now - state.startedAt > ONE_HOUR) {
                             relevantStates[id] = { ...state, status: 'error', error: 'Indexing timed out' }
                         } else {
@@ -57,7 +58,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
                                 setTimeout(() => startPolling(id, state.backendProjectId!), 500)
                             }
                         }
-                    } else if (state.status === 'completed' && state.completedAt && now - state.completedAt < 5 * 60 * 1000) {
+                    } else if ((state.status === 'completed' || state.status === 'cancelled') && state.completedAt && now - state.completedAt < 5 * 60 * 1000) {
                         relevantStates[id] = state
                     }
                 }
@@ -119,6 +120,25 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
                             ...current,
                             status: 'error',
                             error: data.error || 'Indexing failed'
+                        }
+                        saveIndexingState(updated).catch(() => { })
+                        return { ...prev, [projectId]: updated }
+                    })
+                    return
+                }
+
+                if (data.status === 'cancelled') {
+                    console.log('🛑 CANCELLED!')
+                    clearInterval(pollingIntervalsRef.current[projectId])
+                    delete pollingIntervalsRef.current[projectId]
+                    setIndexingStates(prev => {
+                        const current = prev[projectId]
+                        if (!current) return prev
+                        const updated: ProjectIndexingState = {
+                            ...current,
+                            status: 'cancelled',
+                            currentStep: 'Sync cancelled',
+                            completedAt: Date.now()
                         }
                         saveIndexingState(updated).catch(() => { })
                         return { ...prev, [projectId]: updated }
@@ -281,6 +301,52 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    const cancelIndexing = useCallback(async (projectId: string) => {
+        const state = indexingStates[projectId]
+        if (!state?.backendProjectId) {
+            console.log('⚠️ No backend project ID to cancel')
+            dismissIndexing(projectId)
+            return
+        }
+
+        console.log(`🛑 CANCELLING | projectId="${projectId}" | backendId="${state.backendProjectId}"`)
+
+        // Update state to "cancelling"
+        setIndexingStates(prev => {
+            const current = prev[projectId]
+            if (!current) return prev
+            const updated: ProjectIndexingState = {
+                ...current,
+                status: 'cancelling',
+                currentStep: 'Cancelling sync...'
+            }
+            saveIndexingState(updated).catch(() => { })
+            return { ...prev, [projectId]: updated }
+        })
+
+        try {
+            // Call the cancel endpoint
+            const response = await fetch(
+                `/api/projects/cancel-indexing?project_id=${encodeURIComponent(state.backendProjectId)}`,
+                { method: 'POST' }
+            )
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Cancel failed' }))
+                console.log('❌ Cancel failed:', error)
+                setError(projectId, error.error || 'Failed to cancel sync')
+                return
+            }
+
+            console.log('✅ Cancel request sent, continuing to poll for cancelled status...')
+            // The polling will continue and eventually receive 'cancelled' status from backend
+        } catch (err) {
+            console.log('❌ Cancel error:', err)
+            setError(projectId, err instanceof Error ? err.message : 'Failed to cancel sync')
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [indexingStates, setError])
+
     const dismissIndexing = useCallback((projectId: string) => {
         if (pollingIntervalsRef.current[projectId]) {
             clearInterval(pollingIntervalsRef.current[projectId])
@@ -294,16 +360,17 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
     }, [])
 
     const isAnyIndexing = Object.values(indexingStates).some(
-        s => s.status === 'indexing' || s.status === 'vectorizing'
+        s => s.status === 'indexing' || s.status === 'vectorizing' || s.status === 'cancelling'
     )
     const activeIndexingCount = Object.values(indexingStates).filter(
-        s => s.status === 'indexing' || s.status === 'vectorizing'
+        s => s.status === 'indexing' || s.status === 'vectorizing' || s.status === 'cancelling'
     ).length
 
     return (
         <IndexingContext.Provider value={{
             indexingStates,
             startIndexing,
+            cancelIndexing,
             updateProgress,
             completeIndexing,
             setError,

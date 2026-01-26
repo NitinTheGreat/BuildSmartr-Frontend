@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Mail, MessageSquare, FileText, CheckCircle2, AlertCircle, Sparkles } from "lucide-react"
+import { X, Mail, MessageSquare, FileText, CheckCircle2, AlertCircle, Sparkles, Ban, Loader2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { ProjectIndexingState } from "@/types/project"
 import { useRouter } from "next/navigation"
+import { useIndexing } from "@/contexts/IndexingContext"
 
 interface ProjectIndexingModalProps {
     isOpen: boolean
@@ -24,6 +25,7 @@ export function ProjectIndexingModal({
 }: ProjectIndexingModalProps) {
     const [showConfetti, setShowConfetti] = useState(false)
     const router = useRouter()
+    const { cancelIndexing } = useIndexing()
 
     // Trigger confetti on completion
     useEffect(() => {
@@ -36,9 +38,18 @@ export function ProjectIndexingModal({
 
     const isCompleted = indexingState?.status === 'completed'
     const isError = indexingState?.status === 'error'
+    const isCancelling = indexingState?.status === 'cancelling'
+    const isCancelled = indexingState?.status === 'cancelled'
+    const isIndexing = indexingState?.status === 'indexing' || indexingState?.status === 'vectorizing' || indexingState?.status === 'pending'
     const percent = Math.round(indexingState?.percent || 0)
     const step = indexingState?.currentStep || 'Initializing...'
     const stats = indexingState?.stats
+
+    const handleCancelSync = async () => {
+        if (indexingState?.projectId) {
+            await cancelIndexing(indexingState.projectId)
+        }
+    }
 
     return (
         <AnimatePresence>
@@ -113,6 +124,14 @@ export function ProjectIndexingModal({
                                     <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
                                         <AlertCircle className="w-5 h-5 text-red-400" />
                                     </div>
+                                ) : isCancelling ? (
+                                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                        <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                                    </div>
+                                ) : isCancelled ? (
+                                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                        <XCircle className="w-5 h-5 text-amber-400" />
+                                    </div>
                                 ) : (
                                     <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center animate-pulse-ring">
                                         <Sparkles className="w-5 h-5 text-accent" />
@@ -120,7 +139,7 @@ export function ProjectIndexingModal({
                                 )}
                                 <div>
                                     <h2 className="text-lg font-semibold text-foreground">
-                                        {isCompleted ? 'Project Ready!' : isError ? 'Something went wrong' : 'Creating Project'}
+                                        {isCompleted ? 'Project Ready!' : isError ? 'Something went wrong' : isCancelling ? 'Cancelling...' : isCancelled ? 'Sync Cancelled' : 'Creating Project'}
                                     </h2>
                                     <p className="text-sm text-muted-foreground truncate max-w-[200px]">
                                         {indexingState?.projectName}
@@ -129,7 +148,7 @@ export function ProjectIndexingModal({
                             </div>
                             <button
                                 onClick={onContinueInBackground}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/50 transition-colors"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/50 transition-colors cursor-pointer"
                             >
                                 <X className="w-4 h-4 text-muted-foreground" />
                             </button>
@@ -137,8 +156,15 @@ export function ProjectIndexingModal({
 
                         {/* Content */}
                         <div className="px-6 pb-6">
+                            {/* Cancelled Message */}
+                            {isCancelled && (
+                                <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                    <p className="text-sm text-amber-400">Sync was cancelled. You can start a new sync from the project page.</p>
+                                </div>
+                            )}
+
                             {/* Progress Bar */}
-                            {!isError && (
+                            {!isError && !isCancelled && (
                                 <div className="mb-6">
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-sm text-muted-foreground">{step}</span>
@@ -243,14 +269,41 @@ export function ProjectIndexingModal({
                                             Try Again
                                         </Button>
                                     </>
-                                ) : (
+                                ) : isCancelled ? (
                                     <Button
-                                        onClick={onContinueInBackground}
+                                        onClick={onClose}
                                         variant="outline"
                                         className="flex-1 border-border hover:bg-muted/30"
                                     >
-                                        Continue in background
+                                        Close
                                     </Button>
+                                ) : isCancelling ? (
+                                    <Button
+                                        variant="outline"
+                                        disabled
+                                        className="flex-1 border-border"
+                                    >
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Cancelling...
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button
+                                            onClick={handleCancelSync}
+                                            variant="outline"
+                                            className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500"
+                                        >
+                                            <Ban className="w-4 h-4 mr-2" />
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            onClick={onContinueInBackground}
+                                            variant="outline"
+                                            className="flex-1 border-border hover:bg-muted/30"
+                                        >
+                                            Continue in background
+                                        </Button>
+                                    </>
                                 )}
                             </div>
                         </div>

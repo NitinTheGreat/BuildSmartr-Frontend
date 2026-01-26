@@ -66,10 +66,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { project_id } = await params
 
   try {
-    const response = await fetch(`${BACKEND_URL}/api/projects/${project_id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
+    const response = await fetch(
+      `${BACKEND_URL}/api/delete_project?project_id=${encodeURIComponent(project_id)}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }
+    )
     const data = await response.json().catch(() => ({}))
     return NextResponse.json(data, { status: response.status })
   } catch {
