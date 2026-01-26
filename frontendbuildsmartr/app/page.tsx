@@ -33,7 +33,7 @@ export default async function Page() {
         <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-accent/3 pointer-events-none" />
         <div className="absolute top-1/4 -left-32 w-64 h-64 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="w-full max-w-md px-6 py-12 relative z-10">
           <div className="text-center mb-10">
             {/* IIVY Logo */}
@@ -45,13 +45,13 @@ export default async function Page() {
                 IIVY
               </span>
             </div>
-            
+
             {/* Tagline badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
               <span className="text-xs font-medium text-accent">Construction Knowledge Engine</span>
             </div>
-            
+
             <h1 className="text-2xl font-semibold text-foreground mb-2">
               Welcome back
             </h1>
@@ -63,7 +63,7 @@ export default async function Page() {
           <div className="flex flex-col items-center">
             <AuthButtons />
           </div>
-          
+
           {/* Footer text */}
           <p className="text-center text-xs text-muted-foreground mt-8">
             By signing in, you agree to our Terms of Service and Privacy Policy

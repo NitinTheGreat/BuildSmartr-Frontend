@@ -222,7 +222,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       if (session && isMounted) {
         setHasLoadedInitialData(true)
         setIsLoading(true)
-        
+
         // Load projects and general chats in parallel for faster initial load
         try {
           await Promise.all([
@@ -247,7 +247,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       if (session && event === 'SIGNED_IN' && !hasLoadedInitialData) {
         setHasLoadedInitialData(true)
         setIsLoading(true)
-        
+
         // Load projects and general chats in parallel
         try {
           await Promise.all([
