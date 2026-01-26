@@ -1,8 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import Image from "next/image";
 import ConnectEmailButtons from "@/components/ConnectEmailButtons";
 import CompanyInfoEditor from "@/components/CompanyInfoEditor";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export default async function AccountPage() {
   const supabase = await createClient();
@@ -106,7 +106,7 @@ export default async function AccountPage() {
         </div>
 
         {/* Connect Email Accounts */}
-        <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
+        <div className="bg-surface border border-border rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
           <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">Connect Email Accounts</h3>
           <p className="text-sm text-muted-foreground mb-4">
             Connect your Gmail or Outlook account to enable email features.
@@ -115,6 +115,15 @@ export default async function AccountPage() {
             gmailEmail={userInfo?.gmail_email} 
             outlookEmail={userInfo?.outlook_email} 
           />
+        </div>
+
+        {/* Sign Out */}
+        <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">Sign Out</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Sign out of your account on this device.
+          </p>
+          <LogoutButton />
         </div>
       </div>
     </div>

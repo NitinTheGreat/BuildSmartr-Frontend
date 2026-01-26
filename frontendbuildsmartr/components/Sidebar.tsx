@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { User, LogOut, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2, Trash2, ExternalLink, XCircle, Ban } from "lucide-react"
+import { User, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2, Trash2, ExternalLink, Ban, MoreVertical } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
@@ -28,16 +28,11 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ projectId: string; projectName: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [projectMenuOpen, setProjectMenuOpen] = useState<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
   const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat, deleteProject, isLoading } = useProjects()
   const { indexingStates, cancelIndexing, dismissIndexing } = useIndexing()
-
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.refresh()
-  }
 
   // Only listen for auth state changes (avatar/name updates)
   // Initial data is passed via props from server component to avoid duplicate auth calls
@@ -104,14 +99,17 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
     setContextMenu({ x: e.clientX, y: e.clientY, projectId })
   }
 
-  // Close context menu when clicking outside
+  // Close context menu and project menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = () => setContextMenu(null)
-    if (contextMenu) {
+    const handleClickOutside = () => {
+      setContextMenu(null)
+      setProjectMenuOpen(null)
+    }
+    if (contextMenu || projectMenuOpen) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [contextMenu])
+  }, [contextMenu, projectMenuOpen])
 
   // Handle delete project
   const handleDeleteProject = async (projectId: string) => {
@@ -343,8 +341,72 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                                   {project.name}
                                 </span>
                                 {project.chats.length > 0 && !indexingStates[project.id] && (
-                                  <span className="text-[10px] text-muted-foreground">{project.chats.length}</span>
+                                  <span className="text-[10px] text-muted-foreground mr-1">{project.chats.length}</span>
                                 )}
+                                {/* 3-dot menu button */}
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setProjectMenuOpen(projectMenuOpen === project.id ? null : project.id)
+                                    }}
+                                    className="p-1 rounded hover:bg-[#334155] opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+                                  {/* Dropdown menu */}
+                                  <AnimatePresence>
+                                    {projectMenuOpen === project.id && (
+                                      <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ duration: 0.1 }}
+                                        className="absolute right-0 top-full mt-1 bg-[#0d1117] border border-border rounded-lg shadow-xl py-1 z-[100] min-w-[140px]"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleProjectNavigate(project.id)
+                                            setProjectMenuOpen(null)
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-[#1e293b] transition-colors"
+                                        >
+                                          <ExternalLink className="w-4 h-4" />
+                                          Open
+                                        </button>
+                                        {/* Show cancel sync option if project is indexing */}
+                                        {(indexingStates[project.id]?.status === 'indexing' || 
+                                          indexingStates[project.id]?.status === 'vectorizing') && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleCancelSync(project.id)
+                                              setProjectMenuOpen(null)
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
+                                          >
+                                            <Ban className="w-4 h-4" />
+                                            Cancel Sync
+                                          </button>
+                                        )}
+                                        <div className="h-px bg-border my-1" />
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setDeleteConfirm({ projectId: project.id, projectName: project.name })
+                                            setProjectMenuOpen(null)
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-[#1e293b] transition-colors"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                          Delete
+                                        </button>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
                               </>
                             )}
                           </div>
@@ -430,49 +492,27 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
 
       {/* Bottom - User Account */}
       <div className={`w-full ${isExpandedView ? 'px-3' : 'px-2'} border-t border-border pt-4`}>
-        <div className="relative group/profile">
-          <Link href="/account" onClick={closeMobileMenu}>
-            <div
-              className={`
-                flex items-center ${isExpandedView ? 'gap-3 px-2' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-[#1e293b] active:scale-[0.98]
-              `}
-            >
-              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center overflow-hidden flex-shrink-0">
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt="Account avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-4 h-4 text-background" />
-                )}
-              </div>
-              {isExpandedView && (
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm text-foreground truncate block">{firstName || 'Account'}</span>
-                </div>
-              )}
-            </div>
-          </Link>
-
-          {/* Logout dropdown - shows on hover using CSS */}
+        <Link href="/account" onClick={closeMobileMenu}>
           <div
             className={`
-              absolute opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all duration-150
-              ${isExpandedView ? 'left-0 right-0 bottom-full mb-1' : 'left-full top-1/2 -translate-y-1/2 ml-2'}
-              bg-[#0d1117] border border-border rounded-lg shadow-lg py-1 min-w-[120px] z-[60]
+              flex items-center ${isExpandedView ? 'gap-3 px-2' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-all duration-150 hover:bg-[#1e293b] active:scale-[0.98]
             `}
           >
-            <button
-              onClick={() => {
-                handleLogout()
-                closeMobileMenu()
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-[#1e293b] transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
+            <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center overflow-hidden flex-shrink-0">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="Account avatar" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-4 h-4 text-background" />
+              )}
+            </div>
+            {isExpandedView && (
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-foreground truncate block">{firstName || 'Account'}</span>
+              </div>
+            )}
           </div>
-        </div>
+        </Link>
       </div>
     </>
   )

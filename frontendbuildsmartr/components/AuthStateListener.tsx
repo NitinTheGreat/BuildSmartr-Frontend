@@ -14,6 +14,9 @@ export default function AuthStateListener() {
       if (event === "SIGNED_IN" && session) {
         // Refresh the page to get updated server-rendered content
         router.refresh();
+      } else if (event === "SIGNED_OUT") {
+        // Force a hard redirect to clear all state
+        window.location.href = "/";
       }
     });
 
