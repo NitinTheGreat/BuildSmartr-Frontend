@@ -11,6 +11,9 @@ import type {
     ErrorEventData,
 } from '@/types/streaming'
 
+// AI Backend URL - called directly for streaming (bypasses Database Backend buffering)
+const AI_BACKEND_URL = process.env.NEXT_PUBLIC_AI_BACKEND_URL || 'http://localhost:7071'
+
 const initialState: StreamingSearchState = {
     isStreaming: false,
     thinkingStatus: null,
@@ -29,11 +32,21 @@ interface UseStreamingSearchReturn extends StreamingSearchState {
 
 /**
  * Hook for handling SSE streaming search requests
- * Provides real-time updates for thinking status, sources, and streamed content
+ * 
+ * ARCHITECTURE: Frontend calls AI Backend DIRECTLY for streaming search.
+ * This bypasses the Database Backend proxy to avoid response buffering.
+ * 
+ * Flow:
+ * 1. Get ai_project_id from Database Backend (via /api/projects/{id})
+ * 2. Call AI Backend directly with ai_project_id for streaming
+ * 
+ * This gives us true real-time token streaming like ChatGPT/Perplexity.
  */
 export function useStreamingSearch(): UseStreamingSearchReturn {
     const [state, setState] = useState<StreamingSearchState>(initialState)
     const abortControllerRef = useRef<AbortController | null>(null)
+    // Cache ai_project_id to avoid repeated lookups
+    const aiProjectIdCache = useRef<Map<string, string>>(new Map())
 
     const reset = useCallback(() => {
         setState(initialState)
@@ -50,7 +63,7 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
     const streamSearch = useCallback(async (
         projectId: string,
         question: string,
-        topK: number = 50
+        topK: number = 30
     ): Promise<string> => {
         // Abort any existing request
         if (abortControllerRef.current) {
@@ -64,24 +77,46 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
         setState({
             ...initialState,
             isStreaming: true,
-            thinkingStatus: 'Starting search...',
+            thinkingStatus: 'Connecting...',
         })
 
         let fullContent = ''
 
         try {
-            console.log('🔍 [useStreamingSearch] Sending search request:')
-            console.log('   project_id:', projectId)
+            // Step 1: Get ai_project_id (check cache first)
+            let aiProjectId = aiProjectIdCache.current.get(projectId)
+
+            if (!aiProjectId) {
+                setState(prev => ({ ...prev, thinkingStatus: 'Loading project...' }))
+
+                const projectRes = await fetch(`/api/projects/${projectId}`)
+                if (!projectRes.ok) {
+                    throw new Error('Failed to load project')
+                }
+                const projectData = await projectRes.json()
+                aiProjectId = projectData.ai_project_id
+
+                if (!aiProjectId) {
+                    throw new Error('Project has not been indexed yet. Please index your emails first.')
+                }
+
+                // Cache for future requests
+                aiProjectIdCache.current.set(projectId, aiProjectId)
+            }
+
+            console.log('🔍 [useStreamingSearch] Calling AI Backend directly:')
+            console.log('   ai_project_id:', aiProjectId)
             console.log('   question:', question)
             console.log('   top_k:', topK)
 
-            // Call Database Backend via frontend API route (which handles auth)
-            const response = await fetch(`/api/projects/${projectId}/search/stream`, {
+            // Step 2: Call AI Backend DIRECTLY (bypasses Database Backend buffering)
+            const response = await fetch(`${AI_BACKEND_URL}/api/search_project_stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    project_id: aiProjectId,
                     question,
                     top_k: topK,
                 }),
