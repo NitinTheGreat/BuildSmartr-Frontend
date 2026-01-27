@@ -137,21 +137,23 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       console.log('✅ Index API returned:', result)
 
       // Only add to activeJobs AFTER successful response - this starts the poller
-      const backendProjectId = result.ai_project_id || projectId
+      // IMPORTANT: Use the Supabase project UUID for status polling, NOT the AI project ID
+      // The status endpoint expects a UUID, not the AI backend's human-readable ID
       setActiveJobs(prev => ({
         ...prev,
         [projectId]: {
           projectId,
           projectName,
-          backendProjectId,
+          backendProjectId: projectId, // Always use Supabase UUID for status polling
           startedAt: newState.startedAt,
         }
       }))
 
-      // Update state with ai_project_id from response
+      // Update state - store ai_project_id for reference but use projectId for polling
       const updatedState: ProjectIndexingState = {
         ...newState,
-        backendProjectId,
+        backendProjectId: projectId, // Use Supabase UUID for polling
+        aiProjectId: result.ai_project_id, // Store AI project ID separately for reference
         currentStep: 'Indexing in progress...',
       }
       setIndexingStates(prev => ({ ...prev, [projectId]: updatedState }))

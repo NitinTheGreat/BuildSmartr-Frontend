@@ -79,8 +79,10 @@ export type IndexingStatus = 'pending' | 'indexing' | 'vectorizing' | 'completed
 export interface ProjectIndexingState {
   projectId: string
   projectName: string
-  /** Backend project ID (e.g., "youtube_a1b2c3d4") used for API calls */
+  /** Supabase project UUID used for status polling */
   backendProjectId?: string
+  /** AI backend's human-readable project ID (e.g., "youtube_a1b2c3d4") */
+  aiProjectId?: string
   status: IndexingStatus
   /** Short phase name: "Searching", "Processing PDFs", "Creating Embeddings" */
   phase?: string
