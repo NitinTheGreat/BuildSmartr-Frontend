@@ -44,6 +44,12 @@ export function ProjectIndexingModal({
     const percent = Math.round(indexingState?.percent || 0)
     const step = indexingState?.currentStep || 'Initializing...'
     const stats = indexingState?.stats
+    
+    // Check if project is empty (no data found)
+    const isEmpty = isCompleted && stats && 
+        (stats.thread_count || 0) === 0 && 
+        (stats.message_count || 0) === 0 && 
+        (stats.pdf_count || 0) === 0
 
     const handleCancelSync = async () => {
         if (indexingState?.projectId) {
@@ -116,7 +122,11 @@ export function ProjectIndexingModal({
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 pb-4">
                             <div className="flex items-center gap-3">
-                                {isCompleted ? (
+                                {isEmpty ? (
+                                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                        <AlertCircle className="w-5 h-5 text-amber-400" />
+                                    </div>
+                                ) : isCompleted ? (
                                     <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
                                         <CheckCircle2 className="w-5 h-5 text-green-400" />
                                     </div>
@@ -139,7 +149,7 @@ export function ProjectIndexingModal({
                                 )}
                                 <div>
                                     <h2 className="text-lg font-semibold text-foreground">
-                                        {isCompleted ? 'Project Ready!' : isError ? 'Something went wrong' : isCancelling ? 'Cancelling...' : isCancelled ? 'Sync Cancelled' : 'Creating Project'}
+                                        {isEmpty ? 'No Emails Found' : isCompleted ? 'Project Ready!' : isError ? 'Something went wrong' : isCancelling ? 'Cancelling...' : isCancelled ? 'Sync Cancelled' : 'Creating Project'}
                                     </h2>
                                     <p className="text-sm text-muted-foreground truncate max-w-[200px]">
                                         {indexingState?.projectName}
@@ -202,6 +212,16 @@ export function ProjectIndexingModal({
                                 </div>
                             )}
 
+                            {/* Empty Project Warning */}
+                            {isEmpty && (
+                                <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                    <p className="text-sm text-amber-400">
+                                        No emails were found matching &quot;{indexingState?.projectName}&quot;. 
+                                        Try a different project name that matches your email subjects or contacts.
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Stats */}
                             {(stats || isCompleted) && !isError && (
                                 <motion.div
@@ -241,7 +261,29 @@ export function ProjectIndexingModal({
 
                             {/* Actions */}
                             <div className="flex gap-3">
-                                {isCompleted ? (
+                                {isEmpty ? (
+                                    <>
+                                        <Button
+                                            onClick={onClose}
+                                            variant="outline"
+                                            className="flex-1 border-border hover:bg-muted/30"
+                                        >
+                                            Close
+                                        </Button>
+                                        <Button
+                                            onClick={() => {
+                                                onClose()
+                                                if (projectId) {
+                                                    router.push(`/project/${projectId}`)
+                                                }
+                                            }}
+                                            variant="outline"
+                                            className="flex-1 border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500"
+                                        >
+                                            View Anyway
+                                        </Button>
+                                    </>
+                                ) : isCompleted ? (
                                     <Button
                                         onClick={() => {
                                             onClose()
