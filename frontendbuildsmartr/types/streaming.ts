@@ -11,11 +11,13 @@ export interface ThinkingEventData {
 }
 
 export interface SourceItem {
-    id?: string
-    title?: string
-    content?: string
-    score?: number
-    metadata?: Record<string, unknown>
+    chunk_id: string
+    chunk_type: string
+    text: string
+    score: number
+    sender: string
+    timestamp: string
+    subject: string
 }
 
 export interface SourcesEventData {

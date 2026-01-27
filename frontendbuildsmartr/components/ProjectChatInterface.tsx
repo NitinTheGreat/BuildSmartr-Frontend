@@ -1,13 +1,14 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
-import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip, MoreVertical, Ban, Loader2 } from "lucide-react"
+import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip, MoreVertical, Ban, Loader2, Search, ExternalLink, Clock, User } from "lucide-react"
 import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile } from "@/types/project"
+import type { SourceItem } from "@/types/streaming"
 import { EditFilesModal } from "./EditFilesModal"
 import { ShareProjectModal } from "./ShareProjectModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
@@ -83,12 +84,29 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const {
     isStreaming,
     thinkingStatus,
+    sources: streamingSources,
     streamedContent,
     error: streamingError,
     stats: streamingStats,
     streamSearch,
     reset: resetStreaming,
   } = useStreamingSearch()
+
+  // Track expanded sources for Perplexity-style UI
+  const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set())
+  const [showAllSources, setShowAllSources] = useState(false)
+
+  const toggleSourceExpanded = useCallback((index: number) => {
+    setExpandedSources(prev => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }, [])
 
   const currentChat = project.chats.find(c => c.id === currentChatId)
   const messages = currentChat?.messages || []
@@ -422,78 +440,61 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         />
 
         <div className="min-h-screen flex flex-col">
-          {/* Header */}
-          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
+          {/* Header - Minimal */}
+          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50">
             <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleBackToProject}
-                  className="p-2 hover:bg-[#1e293b] rounded-lg transition-colors"
+                  className="p-2 hover:bg-muted/30 rounded-lg transition-colors"
                 >
-                  <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+                  <ArrowLeft className="w-4 h-4 text-muted-foreground" />
                 </button>
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-accent" />
-                  <h1 className="font-semibold text-foreground">{currentChat.title}</h1>
+                <div>
+                  <h1 className="text-sm font-medium text-foreground line-clamp-1">{currentChat.title}</h1>
+                  <p className="text-xs text-muted-foreground">{project.name}</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => setIsEditFilesModalOpen(true)}
-                className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
+                className="p-2 hover:bg-muted/30 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
               >
                 <FileEdit className="w-4 h-4" />
-                Edit Files
-              </Button>
+              </button>
             </div>
           </div>
 
-          {/* Messages */}
+          {/* Messages - Perplexity Style */}
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+            <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
               {messages.map((message) => (
                 <motion.div
                   key={message.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className="w-full"
                 >
-                  <div
-                    className={`
-                      max-w-[80%] px-4 py-3 rounded-2xl
-                      ${message.role === 'user'
-                        ? 'bg-accent text-background rounded-br-md'
-                        : 'bg-[#111827] text-foreground rounded-bl-md'
-                      }
-                    `}
-                  >
-                    {/* Show search modes if present */}
-                    {message.searchModes && message.searchModes.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {message.searchModes.map(mode => {
-                          const Icon = getModeIcon(mode)
-                          return (
-                            <span
-                              key={mode}
-                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${message.role === 'user'
-                                ? 'bg-background/20 text-background'
-                                : 'bg-accent/20 text-accent'
-                                }`}
-                            >
-                              <Icon className="w-2.5 h-2.5" />
-                              {getModeLabel(mode)}
-                            </span>
-                          )
-                        })}
+                  {message.role === 'user' ? (
+                    /* User Message - Clean, right-aligned */
+                    <div className="flex justify-end mb-4">
+                      <div className="max-w-[75%] px-4 py-3 bg-accent text-background rounded-2xl rounded-br-sm">
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                       </div>
-                    )}
-                    {message.role === 'assistant' ? (
-                      <MarkdownRenderer content={message.content} />
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    /* Assistant Message - Perplexity Style */
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-md bg-green-500/10 flex items-center justify-center">
+                          <Sparkles className="w-3.5 h-3.5 text-green-400" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground">Answer</span>
+                      </div>
+                      <div className="pl-8 prose prose-invert prose-sm max-w-none">
+                        <MarkdownRenderer content={message.content} />
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ))}
 
@@ -502,25 +503,9 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-end"
+                  className="flex justify-end mb-4"
                 >
-                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-accent text-background rounded-br-md">
-                    {optimisticMessage.searchModes && optimisticMessage.searchModes.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {optimisticMessage.searchModes.map(mode => {
-                          const Icon = getModeIcon(mode)
-                          return (
-                            <span
-                              key={mode}
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-background/20 text-background"
-                            >
-                              <Icon className="w-2.5 h-2.5" />
-                              {getModeLabel(mode)}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )}
+                  <div className="max-w-[75%] px-4 py-3 bg-accent text-background rounded-2xl rounded-br-sm">
                     <p className="text-sm whitespace-pre-wrap">{optimisticMessage.content}</p>
                   </div>
                 </motion.div>
@@ -528,8 +513,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
               {/* Queued messages - shown as subtle compact list */}
               {messageQueue.length > 0 && (
-                <div className="flex justify-end">
-                  <div className="max-w-[80%] space-y-2">
+                <div className="flex justify-end mb-4">
+                  <div className="max-w-[75%] space-y-2">
                     <div className="text-xs text-muted-foreground text-right flex items-center justify-end gap-2">
                       <span className="inline-block w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
                       {messageQueue.length} message{messageQueue.length !== 1 ? 's' : ''} queued
@@ -538,8 +523,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                       <motion.div
                         key={`queued-${index}`}
                         initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 0.6, x: 0 }}
-                        className="px-3 py-2 bg-accent/30 border border-accent/20 rounded-lg text-sm text-foreground/80 text-right"
+                        animate={{ opacity: 0.5, x: 0 }}
+                        className="px-3 py-2 bg-accent/20 border border-accent/10 rounded-xl text-sm text-foreground/70 text-right"
                       >
                         <span className="line-clamp-1">{queuedMsg.content}</span>
                       </motion.div>
@@ -548,36 +533,190 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 </div>
               )}
 
-              {(isStreaming || streamedContent) && (
+              {/* Perplexity-style AI Response */}
+              {(isStreaming || streamedContent || streamingSources.length > 0 || thinkingStatus) && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-start"
+                  className="w-full"
                 >
-                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-[#111827] text-foreground rounded-bl-md">
-                    {/* Thinking status */}
+                  <div className="space-y-4">
+                    {/* Thinking Status - Animated */}
                     {thinkingStatus && !streamedContent && (
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <Spinner size="sm" variant="dots" />
-                        <span>{thinkingStatus}</span>
-                      </div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-3 p-4 bg-gradient-to-r from-accent/5 to-transparent rounded-xl border border-accent/10"
+                      >
+                        <div className="relative w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                          <Search className="w-5 h-5 text-accent" />
+                          <motion.div
+                            className="absolute inset-0 rounded-full border-2 border-accent/30"
+                            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{thinkingStatus}</p>
+                          <div className="flex gap-1 mt-1.5">
+                            {[0, 1, 2].map(i => (
+                              <motion.div
+                                key={i}
+                                className="w-1.5 h-1.5 bg-accent rounded-full"
+                                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
+                                transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
 
-                    {/* Streamed content */}
+                    {/* Sources Panel - Perplexity Style */}
+                    {streamingSources.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-3"
+                      >
+                        {/* Sources Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-md bg-accent/10 flex items-center justify-center">
+                              <FileText className="w-3.5 h-3.5 text-accent" />
+                            </div>
+                            <span className="text-sm font-medium text-foreground">
+                              {streamingSources.length} source{streamingSources.length !== 1 ? 's' : ''} found
+                            </span>
+                          </div>
+                          {streamingSources.length > 3 && (
+                            <button
+                              onClick={() => setShowAllSources(!showAllSources)}
+                              className="text-xs text-accent hover:text-accent/80 transition-colors"
+                            >
+                              {showAllSources ? 'Show less' : `View all ${streamingSources.length}`}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Sources Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {(showAllSources ? streamingSources : streamingSources.slice(0, 3)).map((source, i) => (
+                            <motion.button
+                              key={source.chunk_id || i}
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: i * 0.05 }}
+                              onClick={() => toggleSourceExpanded(i)}
+                              className="group text-left p-3 bg-[#0d1117] hover:bg-[#161b22] border border-border/50 hover:border-accent/30 rounded-lg transition-all duration-200"
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <span className="flex items-center justify-center w-5 h-5 bg-accent/10 text-accent text-[10px] font-bold rounded shrink-0">
+                                  {i + 1}
+                                </span>
+                                <span className={`px-1.5 py-0.5 text-[10px] rounded ${source.chunk_type === 'email_body'
+                                    ? 'bg-blue-500/10 text-blue-400'
+                                    : 'bg-purple-500/10 text-purple-400'
+                                  }`}>
+                                  {source.chunk_type === 'email_body' ? 'Email' : 'Document'}
+                                </span>
+                              </div>
+
+                              {/* Subject/Title */}
+                              <p className="text-xs font-medium text-foreground line-clamp-1 mb-1">
+                                {source.subject || 'Untitled'}
+                              </p>
+
+                              {/* Preview Text */}
+                              <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">
+                                {source.text}
+                              </p>
+
+                              {/* Metadata */}
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
+                                <div className="flex items-center gap-1">
+                                  <User className="w-2.5 h-2.5" />
+                                  <span className="truncate max-w-[80px]">{source.sender || 'Unknown'}</span>
+                                </div>
+                                {source.timestamp && (
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    <span>{source.timestamp}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Expanded Content */}
+                              <AnimatePresence>
+                                {expandedSources.has(i) && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="mt-3 pt-3 border-t border-border/30 overflow-hidden"
+                                  >
+                                    <p className="text-xs text-foreground/80 whitespace-pre-wrap">
+                                      {source.text}
+                                    </p>
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <span className="text-[10px] text-muted-foreground">
+                                        Relevance: {Math.round(source.score * 100)}%
+                                      </span>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Answer Section */}
                     {streamedContent && (
-                      <div>
-                        <MarkdownRenderer content={streamedContent} />
-                        {isStreaming && (
-                          <span className="inline-block w-2 h-4 ml-1 bg-accent animate-pulse" />
-                        )}
-                      </div>
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="prose prose-invert prose-sm max-w-none"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-6 h-6 rounded-md bg-green-500/10 flex items-center justify-center">
+                            <Sparkles className="w-3.5 h-3.5 text-green-400" />
+                          </div>
+                          <span className="text-sm font-medium text-foreground">Answer</span>
+                        </div>
+                        <div className="pl-8">
+                          <MarkdownRenderer content={streamedContent} />
+                          {isStreaming && (
+                            <motion.span
+                              className="inline-block w-2 h-5 ml-0.5 bg-accent rounded-sm"
+                              animate={{ opacity: [1, 0, 1] }}
+                              transition={{ duration: 0.8, repeat: Infinity }}
+                            />
+                          )}
+                        </div>
+                      </motion.div>
                     )}
 
-                    {/* Stats after completion */}
+                    {/* Stats Footer */}
                     {streamingStats && !isStreaming && (
-                      <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-                        Search: {streamingStats.searchTimeMs}ms • LLM: {streamingStats.llmTimeMs}ms
-                      </div>
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex items-center gap-4 pt-3 border-t border-border/20 text-xs text-muted-foreground"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Search className="w-3 h-3" />
+                          <span>Search: {streamingStats.searchTimeMs}ms</span>
+                        </div>
+                        <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3" />
+                          <span>Generation: {streamingStats.llmTimeMs}ms</span>
+                        </div>
+                        <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                        <span>Total: {streamingStats.totalTimeMs}ms</span>
+                      </motion.div>
                     )}
                   </div>
                 </motion.div>
@@ -588,10 +727,18 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex justify-start"
+                  className="w-full"
                 >
-                  <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 rounded-bl-md">
-                    <p className="text-sm">⚠️ {streamingError}</p>
+                  <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                        <X className="w-4 h-4 text-red-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-red-400 mb-1">Something went wrong</p>
+                        <p className="text-sm text-red-400/80">{streamingError}</p>
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -600,53 +747,18 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
             </div>
           </div>
 
-          {/* Input at bottom */}
-          <div className="sticky bottom-0 bg-background border-t border-border z-20 overflow-visible">
-            <div className="max-w-3xl mx-auto px-4 py-4">
+          {/* Input at bottom - Perplexity Style */}
+          <div className="sticky bottom-0 bg-gradient-to-t from-background via-background to-transparent pt-4 z-20">
+            <div className="max-w-3xl mx-auto px-4 pb-4">
               <form onSubmit={handleSubmit} className="relative">
-                <div className="relative bg-surface rounded-xl border border-border shadow-sm hover:border-muted transition-colors overflow-visible">
-                  {/* Selected modes chips */}
-                  <AnimatePresence>
-                    {selectedModes.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="px-3 pt-2 flex flex-wrap gap-1.5"
-                      >
-                        {selectedModes.map(mode => {
-                          const Icon = getModeIcon(mode)
-                          return (
-                            <motion.div
-                              key={mode}
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.8 }}
-                              className="flex items-center gap-1 px-2 py-0.5 bg-accent/20 text-accent rounded-full text-xs font-medium"
-                            >
-                              <Icon className="w-3 h-3" />
-                              <span>{getModeLabel(mode)}</span>
-                              <button
-                                type="button"
-                                onClick={() => removeMode(mode)}
-                                className="hover:bg-accent/30 rounded-full p-0.5 transition-colors"
-                              >
-                                <X className="w-2.5 h-2.5" />
-                              </button>
-                            </motion.div>
-                          )
-                        })}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="flex items-start gap-3 p-3">
+                <div className="relative bg-[#0d1117] rounded-2xl border border-border/50 shadow-lg hover:border-accent/30 focus-within:border-accent/50 transition-all duration-200">
+                  <div className="flex items-end gap-3 p-3">
                     <textarea
                       ref={textareaRef}
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Message..."
-                      className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none min-h-[24px] max-h-[200px] py-1"
+                      placeholder="Ask a follow-up question..."
+                      className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground/60 resize-none outline-none min-h-[24px] max-h-[120px] py-1.5 text-sm"
                       rows={1}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
@@ -656,113 +768,29 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                       }}
                     />
 
-                    <div className="flex items-center gap-2">
-                      {/*
-                      // Search mode dropdown, mic, and sparkles icons commented out
-                      <div className="relative" ref={dropdownRef}>
-                        <motion.button
-                          type="button"
-                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                          className={`flex items-center gap-1 p-1.5 rounded-lg transition-colors ${
-                            selectedModes.length > 0 
-                              ? 'text-accent bg-accent/10' 
-                              : 'text-muted-foreground hover:text-foreground hover:bg-[#1e293b]'
-                          }`}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Globe className="w-4 h-4" />
-                          <ChevronDown className={`w-2.5 h-2.5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                        </motion.button>
-
-                        <AnimatePresence>
-                          {isDropdownOpen && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                              transition={{ duration: 0.15 }}
-                              className="absolute right-0 bottom-full mb-2 bg-[#111827] border border-border rounded-xl shadow-xl py-2 min-w-[180px] z-[100]"
-                            >
-                              {searchModeOptions.map((option) => {
-                                const Icon = option.icon
-                                const isSelected = selectedModes.includes(option.id)
-                                const isDisabled = option.exclusive 
-                                  ? selectedModes.length > 0 && !selectedModes.includes('pdf')
-                                  : selectedModes.includes('pdf')
-                                
-                                return (
-                                  <button
-                                    key={option.id}
-                                    type="button"
-                                    onClick={() => handleModeToggle(option.id)}
-                                    disabled={isDisabled && !isSelected}
-                                    className={`
-                                      w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors
-                                      ${isSelected 
-                                        ? 'bg-accent/20 text-accent' 
-                                        : isDisabled 
-                                          ? 'text-muted-foreground/50 cursor-not-allowed'
-                                          : 'text-foreground hover:bg-[#1e293b]'
-                                      }
-                                    `}
-                                  >
-                                    <Icon className={`w-4 h-4 ${isSelected ? 'text-accent' : ''}`} />
-                                    <span className="flex-1 text-left">{option.label}</span>
-                                    {isSelected && (
-                                      <motion.div
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        className="w-2 h-2 rounded-full bg-accent"
-                                      />
-                                    )}
-                                  </button>
-                                )
-                              })}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-
-                      <motion.button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        aria-label="Voice input"
-                      >
-                        <Mic className="size-5" />
-                      </motion.button>
-
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Button
-                          type="submit"
-                          size="icon"
-                          disabled={!query.trim()}
-                          className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-8 w-8"
-                          aria-label="Submit"
-                        >
-                          <Sparkles className="size-4" />
-                        </Button>
-                      </motion.div>
-                      */}
-                      <Button
-                        type="submit"
-                        size="icon"
-                        disabled={!query.trim() || isStreaming}
-                        className="bg-accent hover:bg-accent-strong text-background rounded-lg disabled:opacity-50 h-8 w-8 transition-transform duration-150 hover:scale-105 active:scale-95 cursor-pointer"
-                        aria-label="Send"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
+                    <motion.button
+                      type="submit"
+                      disabled={!query.trim() || isStreaming}
+                      className="w-8 h-8 rounded-lg bg-accent hover:bg-accent/90 text-background flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                      whileHover={{ scale: query.trim() && !isStreaming ? 1.05 : 1 }}
+                      whileTap={{ scale: query.trim() && !isStreaming ? 0.95 : 1 }}
+                      aria-label="Send"
+                    >
+                      {isStreaming ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                          <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
                         </svg>
-                      </Button>
-                    </div>
+                      )}
+                    </motion.button>
                   </div>
                 </div>
+
+                {/* Hint text */}
+                <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
+                  Press Enter to send • Shift+Enter for new line
+                </p>
               </form>
             </div>
           </div>

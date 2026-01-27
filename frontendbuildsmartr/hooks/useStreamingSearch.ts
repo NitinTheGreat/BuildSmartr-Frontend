@@ -134,11 +134,12 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
 
                                 case 'sources': {
                                     const sourcesData = data as SourcesEventData
+                                    console.log('📚 Sources received:', sourcesData.sources?.length || 0)
                                     setState(prev => ({
                                         ...prev,
                                         sources: sourcesData.sources || [],
                                         chunksRetrieved: sourcesData.chunks_retrieved,
-                                        thinkingStatus: `Generating answer from ${sourcesData.chunks_retrieved} sources...`,
+                                        thinkingStatus: null, // Clear thinking when sources arrive
                                     }))
                                     break
                                 }
