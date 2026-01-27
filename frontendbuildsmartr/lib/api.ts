@@ -26,6 +26,9 @@ export function toProject(res: ProjectResponse): Project {
     chats: (res.chats || []).map(toProjectChat),
     createdAt: new Date(res.created_at),
     updatedAt: new Date(res.updated_at),
+    // AI Integration fields
+    aiProjectId: res.ai_project_id || null,
+    indexingStatus: res.indexing_status || null,
   }
 }
 

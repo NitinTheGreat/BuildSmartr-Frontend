@@ -15,6 +15,9 @@ export interface ProjectResponse {
   // shares?: ShareResponse[]
   created_at: string
   updated_at: string
+  // AI Integration fields
+  ai_project_id?: string | null
+  indexing_status?: "not_started" | "indexing" | "completed" | "failed" | null
 }
 
 export interface ProjectFileResponse {

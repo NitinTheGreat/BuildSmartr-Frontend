@@ -289,8 +289,12 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         // Clear optimistic message just before we start getting AI response
         setOptimisticMessage(null)
 
-        // Check if project has been indexed (has ai_project_id)
-        const hasBeenIndexed = projectIndexingState?.status === 'completed' || projectIndexingState?.backendProjectId
+        // Check if project has been indexed - use database status (persists across sessions)
+        // OR check active indexing state (for current session)
+        const hasBeenIndexed =
+          project.indexingStatus === 'completed' ||  // Database status (persists)
+          project.aiProjectId ||                      // Has AI project ID in DB
+          projectIndexingState?.status === 'completed' // Active session completed
 
         if (!hasBeenIndexed) {
           const errorMessage = {
@@ -840,16 +844,16 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                         className="absolute right-0 top-full mt-1 bg-[#0d1117] border border-border rounded-lg shadow-xl py-1 min-w-[160px] z-50"
                       >
                         {/* Show cancel sync option if project is indexing */}
-                        {(projectIndexingState?.status === 'indexing' || 
+                        {(projectIndexingState?.status === 'indexing' ||
                           projectIndexingState?.status === 'vectorizing') && (
-                          <button
-                            onClick={handleCancelSync}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
-                          >
-                            <Ban className="w-4 h-4" />
-                            Cancel Sync
-                          </button>
-                        )}
+                            <button
+                              onClick={handleCancelSync}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
+                            >
+                              <Ban className="w-4 h-4" />
+                              Cancel Sync
+                            </button>
+                          )}
                         <button
                           onClick={() => {
                             setIsSettingsOpen(false)
@@ -1135,7 +1139,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
-                Are you sure you want to delete <span className="text-foreground font-medium">&quot;{project.name}&quot;</span>? 
+                Are you sure you want to delete <span className="text-foreground font-medium">&quot;{project.name}&quot;</span>?
                 All project data, chats, and files will be permanently removed.
               </p>
               <div className="flex gap-3">
