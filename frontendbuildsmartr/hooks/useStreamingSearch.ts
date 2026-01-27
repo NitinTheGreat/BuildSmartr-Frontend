@@ -9,11 +9,7 @@ import type {
     ChunkEventData,
     DoneEventData,
     ErrorEventData,
-    SourceItem,
 } from '@/types/streaming'
-
-const AI_BACKEND_URL = process.env.NEXT_PUBLIC_AI_BACKEND_URL || 'http://localhost:7071'
-const AZURE_FUNCTION_KEY = process.env.NEXT_PUBLIC_AZURE_FUNCTION_KEY || ''
 
 const initialState: StreamingSearchState = {
     isStreaming: false,
@@ -78,16 +74,14 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
             console.log('   project_id:', projectId)
             console.log('   question:', question)
             console.log('   top_k:', topK)
-            console.log('   backend URL:', `${AI_BACKEND_URL}/api/search_project_stream`)
 
-            const response = await fetch(`${AI_BACKEND_URL}/api/search_project_stream`, {
+            // Call Database Backend via frontend API route (which handles auth)
+            const response = await fetch(`/api/projects/${projectId}/search/stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-functions-key': AZURE_FUNCTION_KEY,
                 },
                 body: JSON.stringify({
-                    project_id: projectId,
                     question,
                     top_k: topK,
                 }),

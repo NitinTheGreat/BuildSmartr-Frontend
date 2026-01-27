@@ -104,14 +104,14 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
   // ============================================
 
   const startIndexing = useCallback(async (projectId: string, projectName: string) => {
-    console.log(`🚀 START INDEXING | name="${projectName}"`)
+    console.log(`🚀 START INDEXING | projectId="${projectId}" name="${projectName}"`)
 
     const newState: ProjectIndexingState = {
       projectId,
       projectName,
       status: 'indexing',
       percent: 0,
-      currentStep: 'Generating project ID...',
+      currentStep: 'Starting email indexing...',
       startedAt: Date.now(),
     }
 
@@ -119,55 +119,52 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
     await saveIndexingState(newState)
 
     try {
-      // Step 1: Get backend project ID
-      console.log('📡 Calling /api/projects/generate-id...')
-      const idResponse = await fetch('/api/projects/generate-id', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_name: projectName })
-      })
-
-      if (!idResponse.ok) {
-        const errorData = await idResponse.json().catch(() => ({ error: 'Failed to generate ID' }))
-        throw new Error(errorData.error || 'Failed to generate project ID')
-      }
-
-      const { project_id: backendProjectId } = await idResponse.json()
-      if (!backendProjectId) throw new Error('No project_id from backend')
-
-      console.log(`📌 Got project_id: ${backendProjectId}`)
-
-      // Update state with backend ID
-      const updatedState: ProjectIndexingState = {
-        ...newState,
-        backendProjectId,
-        currentStep: 'Starting email search...',
-      }
-      setIndexingStates(prev => ({ ...prev, [projectId]: updatedState }))
-      await saveIndexingState(updatedState)
-
-      // Add to active jobs for polling
+      // Add to active jobs for polling (using projectId as backendProjectId initially)
+      // The Database Backend will return the actual ai_project_id
       setActiveJobs(prev => ({
         ...prev,
         [projectId]: {
           projectId,
           projectName,
-          backendProjectId,
+          backendProjectId: projectId, // Use project UUID, backend will map to ai_project_id
           startedAt: newState.startedAt,
         }
       }))
 
-      // Step 2: Fire indexing in background (don't await)
-      console.log('📡 Firing /api/projects/index in background...')
-      fetch('/api/projects/index', {
+      // Fire indexing request to Database Backend (which handles AI backend internally)
+      console.log(`📡 Calling /api/projects/${projectId}/index...`)
+      const response = await fetch(`/api/projects/${projectId}/index`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_name: projectName })
-      }).then(response => {
-        console.log('✅ Index API returned:', response.status)
-      }).catch(err => {
-        console.log('⚠️ Index API error:', err)
       })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to start indexing' }))
+        throw new Error(errorData.error || errorData.message || 'Failed to start indexing')
+      }
+
+      const result = await response.json()
+      console.log('✅ Index API returned:', result)
+
+      // Update state with ai_project_id from response if available
+      if (result.ai_project_id) {
+        const updatedState: ProjectIndexingState = {
+          ...newState,
+          backendProjectId: result.ai_project_id,
+          currentStep: 'Indexing in progress...',
+        }
+        setIndexingStates(prev => ({ ...prev, [projectId]: updatedState }))
+        await saveIndexingState(updatedState)
+
+        // Update active job with actual ai_project_id
+        setActiveJobs(prev => ({
+          ...prev,
+          [projectId]: {
+            ...prev[projectId],
+            backendProjectId: result.ai_project_id,
+          }
+        }))
+      }
 
     } catch (err) {
       console.log('❌ Error:', err)
@@ -178,6 +175,12 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       }
       setIndexingStates(prev => ({ ...prev, [projectId]: errorState }))
       await saveIndexingState(errorState)
+      
+      // Remove from active jobs on error
+      setActiveJobs(prev => {
+        const { [projectId]: _, ...rest } = prev
+        return rest
+      })
     }
   }, [])
 
@@ -187,8 +190,8 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
 
   const cancelIndexing = useCallback(async (projectId: string) => {
     const state = indexingStates[projectId]
-    if (!state?.backendProjectId) {
-      console.log('⚠️ No backend project ID to cancel')
+    if (!state) {
+      console.log('⚠️ No indexing state to cancel')
       dismissIndexing(projectId)
       return
     }
@@ -205,14 +208,14 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
     await saveIndexingState(cancellingState)
 
     try {
-      const response = await fetch(
-        `/api/projects/cancel-indexing?project_id=${encodeURIComponent(state.backendProjectId)}`,
-        { method: 'POST' }
-      )
+      // Call Database Backend's cancel endpoint using project UUID
+      const response = await fetch(`/api/projects/${projectId}/index/cancel`, {
+        method: 'POST',
+      })
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Cancel failed' }))
-        throw new Error(error.error || 'Failed to cancel sync')
+        throw new Error(error.error || error.message || 'Failed to cancel sync')
       }
 
       console.log('✅ Cancel request sent')

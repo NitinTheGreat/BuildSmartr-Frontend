@@ -286,30 +286,13 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
 
       // Use streaming search API
       try {
-        let backendProjectId = projectIndexingState?.backendProjectId
-
-        if (!backendProjectId) {
-          try {
-            const response = await fetch('/api/projects/generate-id', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ project_name: project.name })
-            })
-            if (response.ok) {
-              const data = await response.json()
-              if (data.project_id) {
-                backendProjectId = data.project_id
-              }
-            }
-          } catch (fetchError) {
-            console.error('Failed to generate project ID:', fetchError)
-          }
-        }
-
         // Clear optimistic message just before we start getting AI response
         setOptimisticMessage(null)
 
-        if (!backendProjectId) {
+        // Check if project has been indexed (has ai_project_id)
+        const hasBeenIndexed = projectIndexingState?.status === 'completed' || projectIndexingState?.backendProjectId
+
+        if (!hasBeenIndexed) {
           const errorMessage = {
             role: 'assistant' as const,
             content: 'This project hasn\'t been indexed yet. Please index your emails first to enable AI search.',
@@ -318,7 +301,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           return
         }
 
-        const aiResponse = await streamSearch(backendProjectId, messageContent)
+        // Use project.id (Supabase UUID) - the Database Backend will handle the ai_project_id mapping
+        const aiResponse = await streamSearch(project.id, messageContent)
 
         if (aiResponse) {
           const assistantMessage = {

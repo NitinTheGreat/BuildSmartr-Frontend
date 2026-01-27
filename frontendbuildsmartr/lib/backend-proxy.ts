@@ -6,7 +6,9 @@
 import { createClient } from "@/utils/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071"
+// Database Backend URL (BuildSmartr-Backend)
+// Note: AI Backend runs on 7071, Database Backend runs on 7072
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7072"
 
 export interface ProxyOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"

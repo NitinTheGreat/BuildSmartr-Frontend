@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/utils/supabase/server"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071"
+// Database Backend URL (BuildSmartr-Backend)
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7072"
 
 interface RouteParams {
   params: Promise<{ project_id: string; file_id: string }>

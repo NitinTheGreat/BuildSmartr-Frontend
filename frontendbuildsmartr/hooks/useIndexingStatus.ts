@@ -64,12 +64,15 @@ const fetcher = async (url: string): Promise<IndexingStatusResponse> => {
  * SWR hook for polling indexing status
  * Automatically polls every 2 seconds while indexing is active
  * Stops polling when status is completed, error, or cancelled
+ * 
+ * @param projectId - The Supabase project UUID (not the ai_project_id)
  */
 export function useIndexingStatus(
-  backendProjectId: string | null | undefined
+  projectId: string | null | undefined
 ): UseIndexingStatusReturn {
-  const key = backendProjectId
-    ? `/api/projects/status?project_id=${encodeURIComponent(backendProjectId)}`
+  // Use project UUID for status endpoint
+  const key = projectId
+    ? `/api/projects/${projectId}/index/status`
     : null
 
   const { data, error, isLoading, mutate } = useSWR<IndexingStatusResponse>(

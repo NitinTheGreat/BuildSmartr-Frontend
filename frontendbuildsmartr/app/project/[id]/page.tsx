@@ -7,7 +7,8 @@ import type { Project } from "@/types/project";
 import type { ProjectResponse } from "@/types/api";
 import { toProject } from "@/lib/api";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7071";
+// Database Backend URL (BuildSmartr-Backend)
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7072";
 
 interface PageProps {
   params: Promise<{ id: string }>;
