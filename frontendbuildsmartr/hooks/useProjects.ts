@@ -120,7 +120,7 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
   }, [mutate])
 
   const deleteProject = useCallback(async (id: string): Promise<void> => {
-    // Optimistically remove
+    // Optimistically remove from UI immediately
     await mutate(
       (current) => current?.filter((p) => p.id !== id),
       { revalidate: false }
@@ -128,6 +128,9 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
 
     // Actually delete on server
     await deleteApi(`/projects/${id}`)
+    
+    // Force revalidate to ensure cache is in sync with server
+    await mutate()
   }, [mutate])
 
   return {

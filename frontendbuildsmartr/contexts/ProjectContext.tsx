@@ -268,11 +268,25 @@ export function ProjectProvider({
 
   const deleteProject = useCallback(async (id: string) => {
     setError(null)
-    await deleteApi(`/projects/${id}`)
+    
+    // Optimistically remove from UI
     setProjects(prev => prev.filter(p => p.id !== id))
     if (currentProject?.id === id) {
       setCurrentProject(null)
       setCurrentChatId(null)
+    }
+    
+    // Actually delete on server
+    await deleteApi(`/projects/${id}`)
+    
+    // Refresh projects list to ensure sync with server
+    // This handles edge cases where optimistic update might be wrong
+    try {
+      const data = await fetchApi<ProjectResponse[]>("/projects")
+      setProjects(data.map(toProject))
+    } catch (err) {
+      // Ignore refresh errors - deletion already succeeded
+      console.warn("Failed to refresh projects after delete:", err)
     }
   }, [currentProject])
 
