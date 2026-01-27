@@ -54,6 +54,11 @@ export async function proxyToBackend(
       body: formData ?? (body ? JSON.stringify(body) : undefined),
     })
 
+    // Handle 204 No Content (e.g., successful DELETE)
+    if (response.status === 204) {
+      return new NextResponse(null, { status: 204 })
+    }
+
     const data = await response.json().catch(() => ({}))
 
     // Add cache headers for GET requests

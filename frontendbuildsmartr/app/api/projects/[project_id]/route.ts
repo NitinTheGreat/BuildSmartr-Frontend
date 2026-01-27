@@ -18,6 +18,5 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const { project_id } = await params
-  // Note: Backend uses a different delete endpoint
-  return proxyDelete(`/api/delete_project?project_id=${encodeURIComponent(project_id)}`)
+  return proxyDelete(`/api/projects/${project_id}`)
 }
