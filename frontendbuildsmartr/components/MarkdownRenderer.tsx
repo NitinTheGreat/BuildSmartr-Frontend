@@ -8,7 +8,7 @@ interface MarkdownRendererProps {
 }
 
 /**
- * Simple markdown renderer for chat messages
+ * Professional markdown renderer for chat messages
  * Handles: bold, italic, lists, headers, links, and code blocks
  */
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
@@ -18,25 +18,45 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
         let inCodeBlock = false
         let codeBlockContent: string[] = []
         let codeBlockLang = ''
+        let listStack: { type: 'ul' | 'ol', items: React.ReactNode[] }[] = []
+
+        const flushList = () => {
+            if (listStack.length > 0) {
+                const list = listStack.pop()!
+                const ListTag = list.type === 'ul' ? 'ul' : 'ol'
+                elements.push(
+                    <ListTag key={`list-${elements.length}`} className={`my-4 space-y-2 ${list.type === 'ul' ? 'list-none' : 'list-decimal list-inside'}`}>
+                        {list.items}
+                    </ListTag>
+                )
+            }
+        }
 
         lines.forEach((line, lineIndex) => {
             // Handle code blocks
             if (line.startsWith('```')) {
+                flushList()
                 if (inCodeBlock) {
-                    // End code block
                     elements.push(
-                        <pre key={`code-${lineIndex}`} className="bg-[#1a1b1e] rounded-lg p-3 my-2 overflow-x-auto">
-                            <code className="text-xs text-green-400 font-mono">
-                                {codeBlockContent.join('\n')}
-                            </code>
-                        </pre>
+                        <div key={`code-${lineIndex}`} className="my-4 rounded-xl overflow-hidden border border-border/40">
+                            {codeBlockLang && (
+                                <div className="px-4 py-2 bg-surface/80 border-b border-border/40 text-xs text-muted-foreground font-medium">
+                                    {codeBlockLang}
+                                </div>
+                            )}
+                            <pre className="bg-[#0d1117] p-4 overflow-x-auto">
+                                <code className="text-[13px] text-foreground/90 font-mono leading-relaxed">
+                                    {codeBlockContent.join('\n')}
+                                </code>
+                            </pre>
+                        </div>
                     )
                     codeBlockContent = []
+                    codeBlockLang = ''
                     inCodeBlock = false
                 } else {
-                    // Start code block
                     inCodeBlock = true
-                    codeBlockLang = line.slice(3)
+                    codeBlockLang = line.slice(3).trim()
                 }
                 return
             }
@@ -48,24 +68,27 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
 
             // Handle headers
             if (line.startsWith('### ')) {
+                flushList()
                 elements.push(
-                    <h3 key={lineIndex} className="text-base font-semibold text-foreground mt-3 mb-1">
+                    <h3 key={lineIndex} className="text-base font-semibold text-foreground mt-6 mb-3 tracking-tight">
                         {parseInlineFormatting(line.slice(4))}
                     </h3>
                 )
                 return
             }
             if (line.startsWith('## ')) {
+                flushList()
                 elements.push(
-                    <h2 key={lineIndex} className="text-lg font-semibold text-foreground mt-3 mb-1">
+                    <h2 key={lineIndex} className="text-lg font-semibold text-foreground mt-6 mb-3 tracking-tight">
                         {parseInlineFormatting(line.slice(3))}
                     </h2>
                 )
                 return
             }
             if (line.startsWith('# ')) {
+                flushList()
                 elements.push(
-                    <h1 key={lineIndex} className="text-xl font-bold text-foreground mt-3 mb-2">
+                    <h1 key={lineIndex} className="text-xl font-bold text-foreground mt-6 mb-4 tracking-tight">
                         {parseInlineFormatting(line.slice(2))}
                     </h1>
                 )
@@ -75,11 +98,15 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
             // Handle bullet lists
             if (line.match(/^[\*\-]\s+/)) {
                 const content = line.replace(/^[\*\-]\s+/, '')
-                elements.push(
-                    <div key={lineIndex} className="flex gap-2 ml-2 my-0.5">
-                        <span className="text-accent mt-1">•</span>
-                        <span>{parseInlineFormatting(content)}</span>
-                    </div>
+                if (listStack.length === 0 || listStack[listStack.length - 1].type !== 'ul') {
+                    flushList()
+                    listStack.push({ type: 'ul', items: [] })
+                }
+                listStack[listStack.length - 1].items.push(
+                    <li key={`li-${lineIndex}`} className="flex gap-3 text-[15px] leading-relaxed text-foreground/90">
+                        <span className="text-accent mt-1.5 text-xs">●</span>
+                        <span className="flex-1">{parseInlineFormatting(content)}</span>
+                    </li>
                 )
                 return
             }
@@ -88,35 +115,55 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
             if (line.match(/^\d+\.\s+/)) {
                 const match = line.match(/^(\d+)\.\s+(.*)/)
                 if (match) {
-                    elements.push(
-                        <div key={lineIndex} className="flex gap-2 ml-2 my-0.5">
-                            <span className="text-accent font-medium min-w-[1.5rem]">{match[1]}.</span>
-                            <span>{parseInlineFormatting(match[2])}</span>
-                        </div>
+                    if (listStack.length === 0 || listStack[listStack.length - 1].type !== 'ol') {
+                        flushList()
+                        listStack.push({ type: 'ol', items: [] })
+                    }
+                    listStack[listStack.length - 1].items.push(
+                        <li key={`li-${lineIndex}`} className="flex gap-3 text-[15px] leading-relaxed text-foreground/90">
+                            <span className="text-accent font-semibold min-w-[1.5rem]">{match[1]}.</span>
+                            <span className="flex-1">{parseInlineFormatting(match[2])}</span>
+                        </li>
                     )
                 }
                 return
             }
 
+            // Not a list item, flush any pending list
+            flushList()
+
             // Handle horizontal rule
             if (line.match(/^---+$/)) {
-                elements.push(<hr key={lineIndex} className="my-3 border-border/50" />)
+                elements.push(<hr key={lineIndex} className="my-6 border-border/30" />)
+                return
+            }
+
+            // Handle blockquote
+            if (line.startsWith('> ')) {
+                elements.push(
+                    <blockquote key={lineIndex} className="my-4 pl-4 py-2 border-l-2 border-accent/50 bg-accent/5 rounded-r-lg text-[15px] text-foreground/80 italic">
+                        {parseInlineFormatting(line.slice(2))}
+                    </blockquote>
+                )
                 return
             }
 
             // Handle empty lines
             if (line.trim() === '') {
-                elements.push(<div key={lineIndex} className="h-2" />)
+                elements.push(<div key={lineIndex} className="h-3" />)
                 return
             }
 
             // Regular paragraph
             elements.push(
-                <p key={lineIndex} className="my-1">
+                <p key={lineIndex} className="my-3 text-[15px] leading-[1.75] text-foreground/90">
                     {parseInlineFormatting(line)}
                 </p>
             )
         })
+
+        // Flush any remaining list
+        flushList()
 
         return elements
     }
@@ -149,7 +196,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
                     parts.push(<span key={keyIndex++}>{parseInlineFormatting(italicMatch[1])}</span>)
                 }
                 parts.push(
-                    <em key={keyIndex++} className="italic">
+                    <em key={keyIndex++} className="italic text-foreground/80">
                         {italicMatch[2]}
                     </em>
                 )
@@ -164,7 +211,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
                     parts.push(<span key={keyIndex++}>{codeMatch[1]}</span>)
                 }
                 parts.push(
-                    <code key={keyIndex++} className="bg-[#1a1b1e] px-1.5 py-0.5 rounded text-xs font-mono text-accent">
+                    <code key={keyIndex++} className="bg-accent/10 px-1.5 py-0.5 rounded-md text-[13px] font-mono text-accent">
                         {codeMatch[2]}
                     </code>
                 )
@@ -184,7 +231,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
                         href={linkMatch[3]}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-accent hover:underline"
+                        className="text-accent hover:text-accent-strong transition-colors underline underline-offset-2 decoration-accent/30 hover:decoration-accent"
                     >
                         {linkMatch[2]}
                     </a>
@@ -202,7 +249,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
     }
 
     return (
-        <div className={`text-sm leading-relaxed ${className}`}>
+        <div className={`leading-relaxed ${className}`}>
             {renderMarkdown(content)}
         </div>
     )

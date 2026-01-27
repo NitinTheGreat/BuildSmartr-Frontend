@@ -146,9 +146,22 @@
     @apply border-border outline-ring/50;
   }
   body {
-    /* Removed gradients for flat Perplexity-style background */
+    /* Clean professional background */
     @apply text-foreground min-h-screen;
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Typography refinements */
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+    letter-spacing: -0.02em;
+  }
+  
+  p {
+    text-wrap: pretty;
   }
   
   /* Hide scrollbar but keep functionality */
@@ -175,6 +188,80 @@
     background-color: var(--border);
     border-radius: 3px;
   }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+}
+
+/* ============================================
+   Professional Prose Styling
+   ============================================ */
+.prose-lg {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.prose h1:first-child, .prose h2:first-child, .prose h3:first-child {
+  margin-top: 0;
+}
+
+.prose ul, .prose ol {
+  padding-left: 1.25em;
+  margin: 1em 0;
+}
+
+.prose li {
+  margin: 0.5em 0;
+}
+
+.prose li::marker {
+  color: var(--accent);
+}
+
+.prose p + p {
+  margin-top: 1em;
+}
+
+.prose blockquote {
+  padding: 0.75em 1em;
+  margin: 1.25em 0;
+  border-radius: 0.5em;
+}
+
+.prose pre {
+  padding: 1em;
+  border-radius: 0.75em;
+  overflow-x: auto;
+}
+
+.prose code:not(pre code) {
+  font-size: 0.875em;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+.prose th, .prose td {
+  padding: 0.75em 1em;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.prose th {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.prose tr:hover td {
+  background: var(--surface);
 }
 
 /* ============================================
