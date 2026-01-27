@@ -119,19 +119,8 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
     await saveIndexingState(newState)
 
     try {
-      // Add to active jobs for polling (using projectId as backendProjectId initially)
-      // The Database Backend will return the actual ai_project_id
-      setActiveJobs(prev => ({
-        ...prev,
-        [projectId]: {
-          projectId,
-          projectName,
-          backendProjectId: projectId, // Use project UUID, backend will map to ai_project_id
-          startedAt: newState.startedAt,
-        }
-      }))
-
       // Fire indexing request to Database Backend (which handles AI backend internally)
+      // IMPORTANT: Don't add to activeJobs until we confirm the request succeeded
       console.log(`📡 Calling /api/projects/${projectId}/index...`)
       const response = await fetch(`/api/projects/${projectId}/index`, {
         method: 'POST',
@@ -139,32 +128,34 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to start indexing' }))
-        throw new Error(errorData.error || errorData.message || 'Failed to start indexing')
+        const errorData = await response.json().catch(() => ({ message: 'Failed to start indexing' }))
+        // Backend returns { error: true, message: "..." } - use message, not error (which is a boolean)
+        throw new Error(errorData.message || (typeof errorData.error === 'string' ? errorData.error : 'Failed to start indexing'))
       }
 
       const result = await response.json()
       console.log('✅ Index API returned:', result)
 
-      // Update state with ai_project_id from response if available
-      if (result.ai_project_id) {
-        const updatedState: ProjectIndexingState = {
-          ...newState,
-          backendProjectId: result.ai_project_id,
-          currentStep: 'Indexing in progress...',
+      // Only add to activeJobs AFTER successful response - this starts the poller
+      const backendProjectId = result.ai_project_id || projectId
+      setActiveJobs(prev => ({
+        ...prev,
+        [projectId]: {
+          projectId,
+          projectName,
+          backendProjectId,
+          startedAt: newState.startedAt,
         }
-        setIndexingStates(prev => ({ ...prev, [projectId]: updatedState }))
-        await saveIndexingState(updatedState)
+      }))
 
-        // Update active job with actual ai_project_id
-        setActiveJobs(prev => ({
-          ...prev,
-          [projectId]: {
-            ...prev[projectId],
-            backendProjectId: result.ai_project_id,
-          }
-        }))
+      // Update state with ai_project_id from response
+      const updatedState: ProjectIndexingState = {
+        ...newState,
+        backendProjectId,
+        currentStep: 'Indexing in progress...',
       }
+      setIndexingStates(prev => ({ ...prev, [projectId]: updatedState }))
+      await saveIndexingState(updatedState)
 
     } catch (err) {
       console.log('❌ Error:', err)
@@ -176,7 +167,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       setIndexingStates(prev => ({ ...prev, [projectId]: errorState }))
       await saveIndexingState(errorState)
       
-      // Remove from active jobs on error
+      // Ensure not in active jobs (shouldn't be, but safety check)
       setActiveJobs(prev => {
         const { [projectId]: _, ...rest } = prev
         return rest
