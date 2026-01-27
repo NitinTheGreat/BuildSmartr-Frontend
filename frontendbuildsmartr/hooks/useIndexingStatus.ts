@@ -1,7 +1,6 @@
 "use client"
 
-import useSWR from "swr"
-import { useMemo } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import type { IndexingStatus } from "@/types/project"
 
 const POLL_INTERVAL = 2000 // 2 seconds
@@ -52,79 +51,115 @@ interface UseIndexingStatusReturn {
   refresh: () => Promise<void>
 }
 
-const fetcher = async (url: string): Promise<IndexingStatusResponse> => {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error("Failed to fetch status")
-  }
-  return response.json()
-}
-
 /**
- * SWR hook for polling indexing status
- * Automatically polls every 2 seconds while indexing is active
- * Stops polling when status is completed, error, or cancelled
+ * Hook for polling indexing status using setInterval
+ * More reliable than SWR's refreshInterval for this use case
  * 
  * @param projectId - The Supabase project UUID (not the ai_project_id)
  */
 export function useIndexingStatus(
   projectId: string | null | undefined
 ): UseIndexingStatusReturn {
-  // Use project UUID for status endpoint
-  const key = projectId
-    ? `/api/projects/${projectId}/index/status`
-    : null
+  const [data, setData] = useState<IndexingStatusResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
 
-  const { data, error, isLoading, mutate } = useSWR<IndexingStatusResponse>(
-    key,
-    fetcher,
-    {
-      refreshInterval: (latestData) => {
-        // Stop polling if completed, error, or cancelled
-        if (!latestData) return POLL_INTERVAL
-        const status = latestData.status
-        if (status === "completed" || status === "error" || status === "cancelled") {
-          return 0 // Stop polling
+  const fetchStatus = useCallback(async () => {
+    if (!projectId) return
+
+    try {
+      setIsLoading(true)
+      console.log(`🔄 Polling status for ${projectId}...`)
+
+      const response = await fetch(`/api/projects/${projectId}/index/status`)
+
+      if (!isMountedRef.current) return
+
+      if (!response.ok) {
+        setError("Failed to fetch status")
+        return
+      }
+
+      const result: IndexingStatusResponse = await response.json()
+      console.log(`📊 Status: ${result.status} ${result.percent}% - ${result.step || result.phase}`)
+
+      setData(result)
+      setError(null)
+
+      // Stop polling if completed, error, or cancelled
+      if (result.status === "completed" || result.status === "error" || result.status === "cancelled") {
+        console.log(`✅ Polling stopped: ${result.status}`)
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
         }
-        return POLL_INTERVAL
-      },
-      revalidateOnFocus: false,
-      dedupingInterval: 1000,
+      }
+    } catch (err) {
+      if (isMountedRef.current) {
+        console.error("❌ Status fetch error:", err)
+        setError(err instanceof Error ? err.message : "Unknown error")
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
-  )
+  }, [projectId])
 
-  const result = useMemo((): UseIndexingStatusReturn => {
-    const status = data?.status ?? null
-    const isActive = status === "indexing" || status === "vectorizing" || status === "pending"
-    const isComplete = status === "completed"
-    const hasError = status === "error" || !!error
-    const isCancelled = status === "cancelled"
+  // Start polling when projectId changes
+  useEffect(() => {
+    isMountedRef.current = true
 
-    return {
-      status,
-      percent: data?.percent ?? 0,
-      step: data?.step ?? null,
-      phase: data?.phase ?? null,
-      stats: data?.details
-        ? {
-            threadCount: data.details.thread_count,
-            messageCount: data.details.message_count,
-            pdfCount: data.details.pdf_count,
-          }
-        : null,
-      error: data?.error ?? error?.message ?? null,
-      isActive,
-      isComplete,
-      hasError,
-      isCancelled,
-      isLoading,
-      refresh: async () => {
-        await mutate()
-      },
+    if (!projectId) {
+      setData(null)
+      return
     }
-  }, [data, error, isLoading, mutate])
 
-  return result
+    // Fetch immediately
+    fetchStatus()
+
+    // Start polling every 2 seconds
+    intervalRef.current = setInterval(fetchStatus, POLL_INTERVAL)
+    console.log(`🚀 Started polling for ${projectId}`)
+
+    return () => {
+      isMountedRef.current = false
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+        console.log(`🛑 Stopped polling for ${projectId}`)
+      }
+    }
+  }, [projectId, fetchStatus])
+
+  const status = data?.status ?? null
+  const isActive = status === "indexing" || status === "vectorizing" || status === "pending"
+  const isComplete = status === "completed"
+  const hasError = status === "error" || !!error
+  const isCancelled = status === "cancelled"
+
+  return {
+    status,
+    percent: data?.percent ?? 0,
+    step: data?.step ?? null,
+    phase: data?.phase ?? null,
+    stats: data?.details
+      ? {
+        threadCount: data.details.thread_count,
+        messageCount: data.details.message_count,
+        pdfCount: data.details.pdf_count,
+      }
+      : null,
+    error: data?.error ?? error ?? null,
+    isActive,
+    isComplete,
+    hasError,
+    isCancelled,
+    isLoading,
+    refresh: fetchStatus,
+  }
 }
 
 /**
