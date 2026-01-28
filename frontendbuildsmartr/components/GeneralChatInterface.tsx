@@ -4,10 +4,9 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { FolderPlus, FolderOpen, ArrowRight, MessageSquare } from "lucide-react"
+import { FolderPlus, FolderOpen, ArrowRight, MessageSquare, Loader2, AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
-import { useIndexing } from "@/contexts/IndexingContext"
 import type { Project, SearchMode } from "@/types/project"
 import { NewProjectModal } from "./NewProjectModal"
 import { createClient } from "@/utils/supabase/client"
@@ -41,45 +40,9 @@ export function GeneralChatInterface({ initialProjects }: GeneralChatInterfacePr
     isLoading: isProjectsLoading,
   } = useProjects()
 
-  const { indexingStates, restoreIndexingState } = useIndexing()
-
   // Use initial projects immediately if context hasn't loaded yet
-  const allProjects = contextProjects.length > 0 ? contextProjects : (initialProjects || [])
-
-  // Auto-restore indexing state for projects that are still indexing according to the database
-  // This handles page refreshes where the local state was lost
-  useEffect(() => {
-    allProjects.forEach(p => {
-      if (p.indexingStatus === 'indexing' && !indexingStates[p.id]) {
-        restoreIndexingState(p.id, p.name)
-      }
-    })
-  }, [allProjects, indexingStates, restoreIndexingState])
-  
-  // Filter out projects that are actively indexing or have errors
-  const projects = allProjects.filter(p => {
-    // Check database-level indexing status (persists across page refreshes)
-    const dbIndexingStatus = p.indexingStatus
-    if (dbIndexingStatus === 'indexing' || dbIndexingStatus === 'not_started') {
-      return false // Hide projects that are still indexing according to the database
-    }
-    
-    // Check local indexing state (for current session)
-    const indexingState = indexingStates[p.id]
-    if (!indexingState) return true // No local indexing state = show project
-    
-    // Hide projects that are actively indexing (local state)
-    const isActivelyIndexing = 
-      indexingState.status === 'indexing' ||
-      indexingState.status === 'vectorizing' ||
-      indexingState.status === 'pending' ||
-      indexingState.status === 'cancelling'
-    
-    // Hide projects that failed with error (local state)
-    const hasError = indexingState.status === 'error'
-    
-    return !isActivelyIndexing && !hasError
-  })
+  // Show ALL projects including indexing/failed ones
+  const projects = contextProjects.length > 0 ? contextProjects : (initialProjects || [])
   const hasInitialData = initialProjects && initialProjects.length > 0
 
   const currentChat = generalChats.find(c => c.id === currentGeneralChatId)
@@ -125,12 +88,17 @@ export function GeneralChatInterface({ initialProjects }: GeneralChatInterfacePr
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleProjectClick = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId)
-    if (project) {
-      setCurrentProject(project)
-      router.push(`/project/${projectId}`)
+  const handleProjectClick = (project: Project) => {
+    // Don't navigate if project is still indexing or failed
+    if (project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started') {
+      return
     }
+    if (project.indexingStatus === 'failed') {
+      return
+    }
+    
+    setCurrentProject(project)
+    router.push(`/project/${project.id}`)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -272,27 +240,57 @@ export function GeneralChatInterface({ initialProjects }: GeneralChatInterfacePr
                   <span className="text-sm text-muted-foreground">{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {projects.map((project, index) => (
-                    <motion.button
-                      key={project.id}
-                      onClick={() => handleProjectClick(project.id)}
-                      className="flex flex-col p-5 bg-surface border border-border rounded-xl hover:border-accent/50 hover:shadow-lg transition-all text-left group cursor-pointer"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 + index * 0.05, duration: 0.4 }}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="p-2.5 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
-                          <FolderOpen className="w-5 h-5 text-accent" />
+                  {projects.map((project, index) => {
+                    const isIndexing = project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started'
+                    const isFailed = project.indexingStatus === 'failed'
+                    const isReady = project.indexingStatus === 'completed' || (!project.indexingStatus && project.aiProjectId)
+                    
+                    return (
+                      <motion.button
+                        key={project.id}
+                        onClick={() => handleProjectClick(project)}
+                        className={`flex flex-col p-5 bg-surface border border-border rounded-xl transition-all text-left group
+                          ${isReady ? 'hover:border-accent/50 hover:shadow-lg cursor-pointer' : 'opacity-70 cursor-default'}
+                        `}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 + index * 0.05, duration: 0.4 }}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className={`p-2.5 rounded-lg transition-colors ${
+                            isIndexing ? 'bg-accent/10' : 
+                            isFailed ? 'bg-red-500/10' : 
+                            'bg-accent/10 group-hover:bg-accent/20'
+                          }`}>
+                            {isIndexing ? (
+                              <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                            ) : isFailed ? (
+                              <AlertCircle className="w-5 h-5 text-red-400" />
+                            ) : (
+                              <FolderOpen className="w-5 h-5 text-accent" />
+                            )}
+                          </div>
+                          {isReady && (
+                            <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-accent transition-all" />
+                          )}
                         </div>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-accent transition-all" />
-                      </div>
-                      <h3 className="font-semibold text-foreground mb-1 line-clamp-1">{project.name}</h3>
-                      {project.description && (
-                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{project.description}</p>
-                      )}
-                    </motion.button>
-                  ))}
+                        <h3 className={`font-semibold mb-1 line-clamp-1 ${isIndexing ? 'text-muted-foreground italic' : 'text-foreground'}`}>
+                          {project.name}
+                        </h3>
+                        {isIndexing && (
+                          <p className="text-sm text-accent mb-2">Syncing emails...</p>
+                        )}
+                        {isFailed && (
+                          <p className="text-sm text-red-400 mb-2 line-clamp-2">
+                            {project.indexingError || 'Failed to sync'}
+                          </p>
+                        )}
+                        {project.description && !isIndexing && !isFailed && (
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{project.description}</p>
+                        )}
+                      </motion.button>
+                    )
+                  })}
                 </div>
               </motion.div>
             )}

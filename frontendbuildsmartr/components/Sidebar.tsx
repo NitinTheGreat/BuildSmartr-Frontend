@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { User, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, CheckCircle2, Trash2, ExternalLink, Ban, MoreVertical } from "lucide-react"
+import { User, Menu, X, Plus, FolderOpen, PanelLeftClose, PanelLeft, MessageSquare, ChevronDown, ChevronRight, Search, Loader2, Trash2, ExternalLink, MoreVertical, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/utils/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
 import Image from "next/image"
 import logo from "@/public/logo.png"
 import { useProjects } from "@/contexts/ProjectContext"
-import { useIndexing } from "@/contexts/IndexingContext"
 import { NewProjectModal } from "./NewProjectModal"
 
 type SidebarProps = {
@@ -32,7 +31,6 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const router = useRouter()
   const pathname = usePathname()
   const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat, deleteProject, isLoading } = useProjects()
-  const { indexingStates, cancelIndexing, dismissIndexing } = useIndexing()
 
   // Only listen for auth state changes (avatar/name updates)
   // Initial data is passed via props from server component to avoid duplicate auth calls
@@ -58,6 +56,18 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
     e.stopPropagation()
     const project = projects.find(p => p.id === projectId)
     if (project) {
+      // Check if project is still indexing
+      if (project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started') {
+        // Don't expand or navigate - just show a toast-like message
+        return
+      }
+
+      // Check if project failed
+      if (project.indexingStatus === 'failed') {
+        // Could show error here, for now just don't expand
+        return
+      }
+
       setCurrentProject(project)
       // Toggle expanded state for this project
       if (expandedProjectId === projectId) {
@@ -75,6 +85,14 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const handleProjectNavigate = (projectId: string) => {
     const project = projects.find(p => p.id === projectId)
     if (project) {
+      // Don't navigate if project is still indexing or failed
+      if (project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started') {
+        return
+      }
+      if (project.indexingStatus === 'failed') {
+        return
+      }
+
       setCurrentProject(project)
       setCurrentChatId(null)
       router.push(`/project/${projectId}`)
@@ -115,10 +133,6 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const handleDeleteProject = async (projectId: string) => {
     setIsDeleting(true)
     try {
-      // Cancel any active indexing first
-      if (indexingStates[projectId]) {
-        dismissIndexing(projectId)
-      }
       await deleteProject(projectId)
       setDeleteConfirm(null)
       // Navigate to home if we deleted the current project
@@ -130,12 +144,6 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
     } finally {
       setIsDeleting(false)
     }
-  }
-
-  // Handle cancel sync
-  const handleCancelSync = async (projectId: string) => {
-    setContextMenu(null)
-    await cancelIndexing(projectId)
   }
 
   // Tooltip component for collapsed state
@@ -282,72 +290,35 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
           )}
 
           {/* Projects List */}
-          {/* Filter out projects that are still actively indexing or have errors - they shouldn't appear until ready */}
+          {/* Show ALL projects with inline status */}
           {projects
-            .filter(p => {
-              // Check database-level indexing status (persists across page refreshes)
-              const dbIndexingStatus = p.indexingStatus
-              if (dbIndexingStatus === 'indexing' || dbIndexingStatus === 'not_started') {
-                return false // Hide projects that are still indexing according to the database
-              }
-
-              // Check local indexing state (for current session)
-              const indexingState = indexingStates[p.id]
-              if (!indexingState) return true // No local indexing state = show project
-
-              const isActivelyIndexing =
-                indexingState.status === 'indexing' ||
-                indexingState.status === 'vectorizing' ||
-                indexingState.status === 'pending' ||
-                indexingState.status === 'cancelling'
-
-              // Also hide projects with errors
-              const hasError = indexingState.status === 'error'
-
-              return !isActivelyIndexing && !hasError
-            })
             .filter(p => searchQuery === '' || p.name.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
               <div className="space-y-1">
                 {isExpandedView && (
                   <span className="text-[10px] uppercase text-muted-foreground px-1 mb-2 block">Projects</span>
                 )}
                 {projects
-                  .filter(p => {
-                    // Check database-level indexing status (persists across page refreshes)
-                    const dbIndexingStatus = p.indexingStatus
-                    if (dbIndexingStatus === 'indexing' || dbIndexingStatus === 'not_started') {
-                      return false // Hide projects that are still indexing according to the database
-                    }
-
-                    // Check local indexing state (for current session)
-                    const indexingState = indexingStates[p.id]
-                    if (!indexingState) return true // No local indexing state = show project
-
-                    const isActivelyIndexing =
-                      indexingState.status === 'indexing' ||
-                      indexingState.status === 'vectorizing' ||
-                      indexingState.status === 'pending' ||
-                      indexingState.status === 'cancelling'
-
-                    // Also hide projects with errors
-                    const hasError = indexingState.status === 'error'
-
-                    return !isActivelyIndexing && !hasError
-                  })
                   .filter(p => searchQuery === '' || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map((project) => {
                     const isProjectExpanded = expandedProjectId === project.id
                     const isCurrentProject = pathname === `/project/${project.id}`
+                    const isIndexing = project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started'
+                    const isFailed = project.indexingStatus === 'failed'
+                    const isReady = project.indexingStatus === 'completed' || (!project.indexingStatus && project.aiProjectId)
 
                     return (
                       <div key={project.id}>
-                        <Tooltip label={project.name}>
+                        <Tooltip label={isIndexing ? `${project.name} (syncing...)` : isFailed ? `${project.name} (failed)` : project.name}>
                           <div
                             onClick={(e) => handleProjectClick(project.id, e)}
                             onContextMenu={(e) => handleContextMenu(e, project.id)}
                             className={`
-                            flex flex-col ${isExpandedView ? 'gap-1 px-3' : 'justify-center'} py-2 rounded-lg cursor-pointer transition-all duration-150 active:scale-[0.98] group
-                            ${isCurrentProject
+                            flex flex-col ${isExpandedView ? 'gap-1 px-3' : 'justify-center'} py-2 rounded-lg transition-all duration-150 group
+                            ${isIndexing || isFailed
+                                ? 'opacity-60 cursor-default'
+                                : 'cursor-pointer active:scale-[0.98]'
+                              }
+                            ${isCurrentProject && isReady
                                 ? 'bg-accent/20 text-foreground'
                                 : 'hover:bg-[#1e293b] text-muted-foreground hover:text-foreground'
                               }
@@ -356,7 +327,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                             <div className={`flex items-center ${isExpandedView ? 'gap-2' : 'justify-center'}`}>
                               {isExpandedView && (
                                 <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                                  {project.chats.length > 0 ? (
+                                  {isReady && project.chats.length > 0 ? (
                                     isProjectExpanded ? (
                                       <ChevronDown className="w-3 h-3" />
                                     ) : (
@@ -365,115 +336,91 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                                   ) : null}
                                 </span>
                               )}
-                              {/* Show check icon briefly after completion, otherwise folder icon */}
-                              {indexingStates[project.id]?.status === 'completed' &&
-                                indexingStates[project.id]?.completedAt &&
-                                Date.now() - indexingStates[project.id].completedAt! < 30000 ? (
-                                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-green-400" />
+                              {/* Status icon */}
+                              {isIndexing ? (
+                                <Loader2 className="w-4 h-4 flex-shrink-0 text-accent animate-spin" />
+                              ) : isFailed ? (
+                                <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
                               ) : (
                                 <FolderOpen className="w-4 h-4 flex-shrink-0" />
                               )}
                               {isExpandedView && (
                                 <>
                                   <span
-                                    className="text-sm truncate flex-1"
+                                    className={`text-sm truncate flex-1 ${isIndexing ? 'italic' : ''}`}
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       handleProjectNavigate(project.id)
                                     }}
                                   >
                                     {project.name}
+                                    {isIndexing && <span className="text-xs text-muted-foreground ml-1">(syncing)</span>}
+                                    {isFailed && <span className="text-xs text-red-400 ml-1">(failed)</span>}
                                   </span>
-                                  {project.chats.length > 0 && !indexingStates[project.id] && (
+                                  {isReady && project.chats.length > 0 && (
                                     <span className="text-[10px] text-muted-foreground mr-1">{project.chats.length}</span>
                                   )}
-                                  {/* 3-dot menu button */}
-                                  <div className="relative">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setProjectMenuOpen(projectMenuOpen === project.id ? null : project.id)
-                                      }}
-                                      className="p-1 rounded hover:bg-[#334155] text-muted-foreground hover:text-foreground transition-colors"
-                                    >
-                                      <MoreVertical className="w-4 h-4" />
-                                    </button>
-                                    {/* Dropdown menu */}
-                                    <AnimatePresence>
-                                      {projectMenuOpen === project.id && (
-                                        <motion.div
-                                          initial={{ opacity: 0, scale: 0.95 }}
-                                          animate={{ opacity: 1, scale: 1 }}
-                                          exit={{ opacity: 0, scale: 0.95 }}
-                                          transition={{ duration: 0.1 }}
-                                          className="absolute right-0 top-full mt-1 bg-[#0d1117] border border-border rounded-lg shadow-xl py-1 z-[100] min-w-[140px]"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleProjectNavigate(project.id)
-                                              setProjectMenuOpen(null)
-                                            }}
-                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-[#1e293b] transition-colors"
+                                  {/* 3-dot menu button - only show for ready or failed projects */}
+                                  {(isReady || isFailed) && (
+                                    <div className="relative">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setProjectMenuOpen(projectMenuOpen === project.id ? null : project.id)
+                                        }}
+                                        className="p-1 rounded hover:bg-[#334155] text-muted-foreground hover:text-foreground transition-colors"
+                                      >
+                                        <MoreVertical className="w-4 h-4" />
+                                      </button>
+                                      {/* Dropdown menu */}
+                                      <AnimatePresence>
+                                        {projectMenuOpen === project.id && (
+                                          <motion.div
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            transition={{ duration: 0.1 }}
+                                            className="absolute right-0 top-full mt-1 bg-[#0d1117] border border-border rounded-lg shadow-xl py-1 z-[100] min-w-[140px]"
+                                            onClick={(e) => e.stopPropagation()}
                                           >
-                                            <ExternalLink className="w-4 h-4" />
-                                            Open
-                                          </button>
-                                          {/* Show cancel sync option if project is indexing */}
-                                          {(indexingStates[project.id]?.status === 'indexing' ||
-                                            indexingStates[project.id]?.status === 'vectorizing') && (
+                                            {isReady && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation()
-                                                  handleCancelSync(project.id)
+                                                  handleProjectNavigate(project.id)
                                                   setProjectMenuOpen(null)
                                                 }}
-                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
+                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-[#1e293b] transition-colors"
                                               >
-                                                <Ban className="w-4 h-4" />
-                                                Cancel Sync
+                                                <ExternalLink className="w-4 h-4" />
+                                                Open
                                               </button>
                                             )}
-                                          <div className="h-px bg-border my-1" />
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              setDeleteConfirm({ projectId: project.id, projectName: project.name })
-                                              setProjectMenuOpen(null)
-                                            }}
-                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-[#1e293b] transition-colors"
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                            Delete
-                                          </button>
-                                        </motion.div>
-                                      )}
-                                    </AnimatePresence>
-                                  </div>
+                                            <div className="h-px bg-border my-1" />
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                setDeleteConfirm({ projectId: project.id, projectName: project.name })
+                                                setProjectMenuOpen(null)
+                                              }}
+                                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-[#1e293b] transition-colors"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                              Delete
+                                            </button>
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
+                                    </div>
+                                  )}
                                 </>
                               )}
                             </div>
-
-                            {/* Indexing progress bar */}
-                            {isExpandedView && indexingStates[project.id]?.status === 'indexing' && (
-                              <div className="mt-1">
-                                <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full bg-gradient-to-r from-accent to-accent-strong transition-all duration-300"
-                                    style={{ width: `${Math.round(indexingStates[project.id]?.percent || 0)}%` }}
-                                  />
-                                </div>
-                                <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                                  {indexingStates[project.id]?.currentStep || 'Indexing...'}
-                                </p>
-                              </div>
-                            )}
                           </div>
                         </Tooltip>
 
-                        {/* Chats list - shown when project is expanded */}
-                        {isExpandedView && isProjectExpanded && project.chats.length > 0 && (
+                        {/* Chats list - shown when project is expanded and ready */}
+                        {isExpandedView && isProjectExpanded && isReady && project.chats.length > 0 && (
                           <AnimatePresence>
                             <motion.div
                               initial={{ opacity: 0, height: 0 }}
@@ -591,17 +538,6 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
               <ExternalLink className="w-4 h-4" />
               Open Project
             </button>
-            {/* Show cancel sync option if project is indexing */}
-            {(indexingStates[contextMenu.projectId]?.status === 'indexing' ||
-              indexingStates[contextMenu.projectId]?.status === 'vectorizing') && (
-                <button
-                  onClick={() => handleCancelSync(contextMenu.projectId)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
-                >
-                  <Ban className="w-4 h-4" />
-                  Cancel Sync
-                </button>
-              )}
             <div className="h-px bg-border my-1" />
             <button
               onClick={() => {

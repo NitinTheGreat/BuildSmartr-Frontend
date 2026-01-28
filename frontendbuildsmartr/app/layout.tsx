@@ -5,8 +5,6 @@ import { Sidebar } from "@/components/Sidebar"
 import { TopBar } from "@/components/TopBar"
 import { getUser } from "@/utils/supabase/server"
 import { ProjectProvider } from "@/contexts/ProjectContext"
-import { IndexingProvider } from "@/contexts/IndexingContext"
-import { FloatingProgressIndicator } from "@/components/FloatingProgressIndicator"
 import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
 
@@ -98,14 +96,11 @@ export default async function RootLayout({
       </head>
       <body className="font-sans antialiased safe-area-all scroll-smooth-ios">
         <ProjectProvider>
-          <IndexingProvider>
-            {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
-            {user && <TopBar userName={firstName || fullName} />}
-            <main className={user ? "ml-0 md:ml-20 transition-all duration-300 ease-out min-h-screen-safe" : "min-h-screen"}>
-              {children}
-            </main>
-            {user && <FloatingProgressIndicator />}
-          </IndexingProvider>
+          {user && <Sidebar initialAvatarUrl={avatarUrl} initialFirstName={firstName} />}
+          {user && <TopBar userName={firstName || fullName} />}
+          <main className={user ? "ml-0 md:ml-20 transition-all duration-300 ease-out min-h-screen-safe" : "min-h-screen"}>
+            {children}
+          </main>
         </ProjectProvider>
         <Analytics />
       </body>

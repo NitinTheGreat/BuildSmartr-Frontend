@@ -13,7 +13,6 @@ import { EditFilesModal } from "./EditFilesModal"
 import { ShareProjectModal } from "./ShareProjectModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
 import { useProjects } from "@/contexts/ProjectContext"
-import { useIndexing } from "@/contexts/IndexingContext"
 import { useStreamingSearch } from "@/hooks/useStreamingSearch"
 import { useRouter } from "next/navigation"
 
@@ -75,10 +74,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     updateProject,
     deleteProject
   } = useProjects()
-
-  const { indexingStates, cancelIndexing, dismissIndexing } = useIndexing()
-  const projectIndexingState = indexingStates[project.id]
-  const indexingStats = projectIndexingState?.stats
 
   // Streaming search hook
   const {
@@ -243,10 +238,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const handleDeleteProject = async () => {
     setIsDeleting(true)
     try {
-      // Cancel any active indexing first
-      if (indexingStates[project.id]) {
-        dismissIndexing(project.id)
-      }
       await deleteProject(project.id)
       router.push('/')
     } catch (error) {
@@ -255,12 +246,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
       setIsDeleting(false)
       setDeleteConfirm(false)
     }
-  }
-
-  // Handle cancel sync
-  const handleCancelSync = async () => {
-    setIsSettingsOpen(false)
-    await cancelIndexing(project.id)
   }
 
   // Process a single message - handles backend communication
@@ -308,11 +293,10 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         setOptimisticMessage(null)
 
         // Check if project has been indexed - use database status (persists across sessions)
-        // OR check active indexing state (for current session)
+        // Check if project has been indexed
         const hasBeenIndexed =
           project.indexingStatus === 'completed' ||  // Database status (persists)
-          project.aiProjectId ||                      // Has AI project ID in DB
-          projectIndexingState?.status === 'completed' // Active session completed
+          project.aiProjectId                        // Has AI project ID in DB
 
         if (!hasBeenIndexed) {
           const errorMessage = {
@@ -911,17 +895,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
                         className="absolute right-0 top-full mt-1 bg-[#0d1117] border border-border rounded-lg shadow-xl py-1 min-w-[160px] z-50"
                       >
-                        {/* Show cancel sync option if project is indexing */}
-                        {(projectIndexingState?.status === 'indexing' ||
-                          projectIndexingState?.status === 'vectorizing') && (
-                            <button
-                              onClick={handleCancelSync}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-[#1e293b] transition-colors"
-                            >
-                              <Ban className="w-4 h-4" />
-                              Cancel Sync
-                            </button>
-                          )}
                         <button
                           onClick={() => {
                             setIsSettingsOpen(false)
@@ -1055,41 +1028,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
             </div>
           )}
         </div>
-
-        {/* Email Data Section */}
-        {indexingStats && (indexingStats.thread_count > 0 || indexingStats.message_count > 0 || indexingStats.pdf_count > 0) && (
-          <div className="w-full max-w-2xl mb-8">
-            <div className="flex items-center gap-2 mb-3">
-              <Mail className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium text-foreground">
-                Indexed Email Data
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-[#111827] border border-border rounded-lg p-4 text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <MessageSquare className="w-5 h-5 text-accent" />
-                </div>
-                <p className="text-xl font-semibold text-foreground">{indexingStats.thread_count || 0}</p>
-                <p className="text-xs text-muted-foreground">Conversations</p>
-              </div>
-              <div className="bg-[#111827] border border-border rounded-lg p-4 text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <Mail className="w-5 h-5 text-accent" />
-                </div>
-                <p className="text-xl font-semibold text-foreground">{indexingStats.message_count || 0}</p>
-                <p className="text-xs text-muted-foreground">Messages</p>
-              </div>
-              <div className="bg-[#111827] border border-border rounded-lg p-4 text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <Paperclip className="w-5 h-5 text-accent" />
-                </div>
-                <p className="text-xl font-semibold text-foreground">{indexingStats.pdf_count || 0}</p>
-                <p className="text-xs text-muted-foreground">Attachments</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Chats Section */}
         <div className="w-full max-w-2xl mb-8">

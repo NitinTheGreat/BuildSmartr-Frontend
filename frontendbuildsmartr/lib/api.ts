@@ -29,6 +29,7 @@ export function toProject(res: ProjectResponse): Project {
     // AI Integration fields
     aiProjectId: res.ai_project_id || null,
     indexingStatus: res.indexing_status || null,
+    indexingError: res.indexing_error || null,
   }
 }
 
@@ -134,12 +135,12 @@ export function isConnectionError(err: unknown): boolean {
  */
 export const swrFetcher = async <T>(url: string): Promise<T> => {
   const response = await fetch(url)
-  
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Request failed" }))
     throw new Error(error.error || response.statusText)
   }
-  
+
   return response.json()
 }
 

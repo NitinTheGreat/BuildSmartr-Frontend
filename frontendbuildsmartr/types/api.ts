@@ -18,6 +18,7 @@ export interface ProjectResponse {
   // AI Integration fields
   ai_project_id?: string | null
   indexing_status?: "not_started" | "indexing" | "completed" | "failed" | null
+  indexing_error?: string | null
 }
 
 export interface ProjectFileResponse {

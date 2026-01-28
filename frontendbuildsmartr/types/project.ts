@@ -70,6 +70,7 @@ export interface Project {
   // AI Integration fields
   aiProjectId?: string | null
   indexingStatus?: 'not_started' | 'indexing' | 'completed' | 'failed' | null
+  indexingError?: string | null
 }
 
 // ============================================
