@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { FolderPlus, FolderOpen, ArrowRight, MessageSquare } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
+import { useIndexing } from "@/contexts/IndexingContext"
 import type { Project, SearchMode } from "@/types/project"
 import { NewProjectModal } from "./NewProjectModal"
 import { createClient } from "@/utils/supabase/client"
@@ -40,8 +41,45 @@ export function GeneralChatInterface({ initialProjects }: GeneralChatInterfacePr
     isLoading: isProjectsLoading,
   } = useProjects()
 
+  const { indexingStates, restoreIndexingState } = useIndexing()
+
   // Use initial projects immediately if context hasn't loaded yet
-  const projects = contextProjects.length > 0 ? contextProjects : (initialProjects || [])
+  const allProjects = contextProjects.length > 0 ? contextProjects : (initialProjects || [])
+
+  // Auto-restore indexing state for projects that are still indexing according to the database
+  // This handles page refreshes where the local state was lost
+  useEffect(() => {
+    allProjects.forEach(p => {
+      if (p.indexingStatus === 'indexing' && !indexingStates[p.id]) {
+        restoreIndexingState(p.id, p.name)
+      }
+    })
+  }, [allProjects, indexingStates, restoreIndexingState])
+  
+  // Filter out projects that are actively indexing or have errors
+  const projects = allProjects.filter(p => {
+    // Check database-level indexing status (persists across page refreshes)
+    const dbIndexingStatus = p.indexingStatus
+    if (dbIndexingStatus === 'indexing' || dbIndexingStatus === 'not_started') {
+      return false // Hide projects that are still indexing according to the database
+    }
+    
+    // Check local indexing state (for current session)
+    const indexingState = indexingStates[p.id]
+    if (!indexingState) return true // No local indexing state = show project
+    
+    // Hide projects that are actively indexing (local state)
+    const isActivelyIndexing = 
+      indexingState.status === 'indexing' ||
+      indexingState.status === 'vectorizing' ||
+      indexingState.status === 'pending' ||
+      indexingState.status === 'cancelling'
+    
+    // Hide projects that failed with error (local state)
+    const hasError = indexingState.status === 'error'
+    
+    return !isActivelyIndexing && !hasError
+  })
   const hasInitialData = initialProjects && initialProjects.length > 0
 
   const currentChat = generalChats.find(c => c.id === currentGeneralChatId)

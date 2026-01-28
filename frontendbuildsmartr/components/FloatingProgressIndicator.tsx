@@ -5,11 +5,14 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronUp, ChevronDown, Loader2, CheckCircle2, AlertCircle, Ban, XCircle } from "lucide-react"
 import { useIndexing } from "@/contexts/IndexingContext"
 import { useRouter } from "next/navigation"
+import { ProjectIndexingModal } from "./ProjectIndexingModal"
 
 export function FloatingProgressIndicator() {
     const { indexingStates, dismissIndexing, cancelIndexing, activeIndexingCount } = useIndexing()
     const [isExpanded, setIsExpanded] = useState(false)
     const [isMinimized, setIsMinimized] = useState(false)
+    const [showIndexingModal, setShowIndexingModal] = useState(false)
+    const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
     const router = useRouter()
 
     // Get all active or recently completed states
@@ -135,7 +138,13 @@ export function FloatingProgressIndicator() {
                     className="p-3 cursor-pointer hover:bg-muted/10 transition-colors"
                     onClick={() => {
                         if (primaryState.projectId) {
-                            router.push(`/project/${primaryState.projectId}`)
+                            // If still indexing, show the indexing modal instead of navigating
+                            if (isIndexing || isCancelling) {
+                                setSelectedProjectId(primaryState.projectId)
+                                setShowIndexingModal(true)
+                            } else {
+                                router.push(`/project/${primaryState.projectId}`)
+                            }
                         }
                     }}
                 >
@@ -209,7 +218,15 @@ export function FloatingProgressIndicator() {
                                     <div
                                         key={state.projectId}
                                         className="p-3 border-b border-border/30 last:border-0 cursor-pointer hover:bg-muted/10 transition-colors"
-                                        onClick={() => router.push(`/project/${state.projectId}`)}
+                                        onClick={() => {
+                                            // If still indexing, show the indexing modal instead of navigating
+                                            if (stateIsIndexing || stateIsCancelling) {
+                                                setSelectedProjectId(state.projectId)
+                                                setShowIndexingModal(true)
+                                            } else {
+                                                router.push(`/project/${state.projectId}`)
+                                            }
+                                        }}
                                     >
                                         <div className="flex items-center justify-between mb-1">
                                             <span className="text-sm text-foreground truncate max-w-[140px]">
@@ -277,6 +294,28 @@ export function FloatingProgressIndicator() {
                     </div>
                 )}
             </div>
+
+            {/* Indexing Modal - shown when clicking on a project that's still indexing */}
+            <ProjectIndexingModal
+                isOpen={showIndexingModal}
+                onClose={() => {
+                    setShowIndexingModal(false)
+                    // Navigate to project if completed
+                    if (selectedProjectId) {
+                        const state = indexingStates[selectedProjectId]
+                        if (state?.status === 'completed') {
+                            router.push(`/project/${selectedProjectId}`)
+                        }
+                    }
+                    setSelectedProjectId(null)
+                }}
+                onContinueInBackground={() => {
+                    setShowIndexingModal(false)
+                    setSelectedProjectId(null)
+                }}
+                indexingState={selectedProjectId ? indexingStates[selectedProjectId] : null}
+                projectId={selectedProjectId || undefined}
+            />
         </motion.div>
     )
 }

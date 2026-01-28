@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react"
 import type { ProjectIndexingState, IndexingStatus } from "@/types/project"
 import {
   saveIndexingState,
@@ -35,6 +35,8 @@ interface IndexingContextType {
   setError: (projectId: string, error: string) => void
   /** Dismiss/remove indexing state from UI */
   dismissIndexing: (projectId: string) => void
+  /** Restore indexing state for a project that's still indexing (after page refresh) */
+  restoreIndexingState: (projectId: string, projectName: string) => void
   /** Whether any project is currently indexing */
   isAnyIndexing: boolean
   /** Count of actively indexing projects */
@@ -62,9 +64,9 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
         const ONE_HOUR = 60 * 60 * 1000
 
         for (const [id, state] of Object.entries(states)) {
-          const isActive = state.status === 'indexing' || state.status === 'vectorizing' || 
-                          state.status === 'pending' || state.status === 'cancelling'
-          
+          const isActive = state.status === 'indexing' || state.status === 'vectorizing' ||
+            state.status === 'pending' || state.status === 'cancelling'
+
           if (isActive) {
             if (now - state.startedAt > ONE_HOUR) {
               // Timed out
@@ -81,8 +83,8 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
                 }
               }
             }
-          } else if ((state.status === 'completed' || state.status === 'cancelled') && 
-                     state.completedAt && now - state.completedAt < 5 * 60 * 1000) {
+          } else if ((state.status === 'completed' || state.status === 'cancelled') &&
+            state.completedAt && now - state.completedAt < 5 * 60 * 1000) {
             // Show completed states for 5 minutes
             relevantStates[id] = state
           }
@@ -168,7 +170,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       }
       setIndexingStates(prev => ({ ...prev, [projectId]: errorState }))
       await saveIndexingState(errorState)
-      
+
       // Ensure not in active jobs (shouldn't be, but safety check)
       setActiveJobs(prev => {
         const { [projectId]: _, ...rest } = prev
@@ -216,7 +218,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       console.log('❌ Cancel error:', err)
       setError(projectId, err instanceof Error ? err.message : 'Failed to cancel sync')
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indexingStates])
 
   // ============================================
@@ -238,7 +240,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
         currentStep: step,
         stats: stats || current.stats,
       }
-      saveIndexingState(updated).catch(() => {})
+      saveIndexingState(updated).catch(() => { })
       return { ...prev, [projectId]: updated }
     })
   }, [])
@@ -259,12 +261,12 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
         completedAt: Date.now(),
         stats: stats || current.stats,
       }
-      saveIndexingState(updated).catch(() => {})
+      saveIndexingState(updated).catch(() => { })
       return { ...prev, [projectId]: updated }
     })
   }, [])
 
-  const setError = useCallback((projectId: string, error: string) => {
+  const setError = useCallback(async (projectId: string, error: string) => {
     setActiveJobs(prev => {
       const { [projectId]: _, ...rest } = prev
       return rest
@@ -277,9 +279,26 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
         status: 'error',
         error,
       }
-      saveIndexingState(updated).catch(() => {})
+      saveIndexingState(updated).catch(() => { })
       return { ...prev, [projectId]: updated }
     })
+
+    // Auto-delete the project from database when indexing fails
+    // This prevents orphan projects that can't be used
+    console.log(`🗑️ Auto-deleting failed project: ${projectId}`)
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        console.log(`✅ Deleted failed project: ${projectId}`)
+        // Error state will persist until user clicks "Okay" / dismisses it
+      } else {
+        console.log(`⚠️ Failed to delete project: ${projectId}`)
+      }
+    } catch (err) {
+      console.log(`⚠️ Error deleting project: ${err}`)
+    }
   }, [])
 
   const dismissIndexing = useCallback((projectId: string) => {
@@ -291,8 +310,43 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       const { [projectId]: _, ...rest } = prev
       return rest
     })
-    clearIndexingState(projectId).catch(() => {})
+    clearIndexingState(projectId).catch(() => { })
   }, [])
+
+  // Restore indexing state for a project that's still indexing (e.g., after page refresh)
+  const restoreIndexingState = useCallback((projectId: string, projectName: string) => {
+    // Check if we already have this project tracked
+    if (indexingStates[projectId]) {
+      console.log(`🔄 Project ${projectId} already being tracked`)
+      return
+    }
+
+    console.log(`🔄 RESTORING indexing state | projectId="${projectId}" name="${projectName}"`)
+
+    const restoredState: ProjectIndexingState = {
+      projectId,
+      projectName,
+      backendProjectId: projectId,
+      status: 'indexing',
+      percent: 0,
+      currentStep: 'Restoring indexing progress...',
+      startedAt: Date.now(),
+    }
+
+    setIndexingStates(prev => ({ ...prev, [projectId]: restoredState }))
+    saveIndexingState(restoredState).catch(() => { })
+
+    // Start polling for status
+    setActiveJobs(prev => ({
+      ...prev,
+      [projectId]: {
+        projectId,
+        projectName,
+        backendProjectId: projectId,
+        startedAt: restoredState.startedAt,
+      }
+    }))
+  }, [indexingStates])
 
   // ============================================
   // Computed Values
@@ -319,6 +373,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
       completeIndexing,
       setError,
       dismissIndexing,
+      restoreIndexingState,
       isAnyIndexing,
       activeIndexingCount,
     }}>
@@ -339,7 +394,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
                 currentStep: step || current.currentStep,
                 stats: stats || current.stats,
               }
-              saveIndexingState(updated).catch(() => {})
+              saveIndexingState(updated).catch(() => { })
               return { ...prev, [job.projectId]: updated }
             })
           }}
@@ -359,7 +414,7 @@ export function IndexingProvider({ children }: { children: ReactNode }) {
                 currentStep: 'Sync cancelled',
                 completedAt: Date.now(),
               }
-              saveIndexingState(updated).catch(() => {})
+              saveIndexingState(updated).catch(() => { })
               return { ...prev, [job.projectId]: updated }
             })
           }}
@@ -384,6 +439,7 @@ interface IndexingStatusPollerProps {
 }
 
 function IndexingStatusPoller({
+  projectId,
   backendProjectId,
   onUpdate,
   onComplete,
@@ -392,28 +448,50 @@ function IndexingStatusPoller({
 }: IndexingStatusPollerProps) {
   const { status, percent, step, stats, isComplete, hasError, isCancelled, error } = useIndexingStatus(backendProjectId)
 
+  // Use refs to avoid infinite loops - callbacks change every render but refs are stable
+  const onUpdateRef = useRef(onUpdate)
+  const onCompleteRef = useRef(onComplete)
+  const onErrorRef = useRef(onError)
+  const onCancelledRef = useRef(onCancelled)
+
+  // Keep refs up to date
+  useEffect(() => {
+    onUpdateRef.current = onUpdate
+    onCompleteRef.current = onComplete
+    onErrorRef.current = onError
+    onCancelledRef.current = onCancelled
+  })
+
+  // Track last status to avoid duplicate calls
+  const lastStatusRef = useRef<string | null>(null)
+
   // Handle status changes
   useEffect(() => {
     if (!status) return
 
+    // Create a status key to detect real changes
+    const statusKey = `${status}-${percent}-${isComplete}-${hasError}-${isCancelled}`
+    if (statusKey === lastStatusRef.current) return
+    lastStatusRef.current = statusKey
+
     if (isComplete) {
-      onComplete(stats ? {
+      onCompleteRef.current(stats ? {
         thread_count: stats.threadCount,
         message_count: stats.messageCount,
         pdf_count: stats.pdfCount,
       } : undefined)
     } else if (hasError && error) {
-      onError(error)
+      onErrorRef.current(error)
     } else if (isCancelled) {
-      onCancelled()
+      onCancelledRef.current()
     } else {
-      onUpdate(status, percent, step, stats ? {
+      onUpdateRef.current(status, percent, step, stats ? {
         thread_count: stats.threadCount,
         message_count: stats.messageCount,
         pdf_count: stats.pdfCount,
       } : null)
     }
-  }, [status, percent, step, stats, isComplete, hasError, isCancelled, error, onUpdate, onComplete, onError, onCancelled])
+  }, [status, percent, step, stats, isComplete, hasError, isCancelled, error])
 
   return null // This is a headless component
 }
