@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // Handle error responses
     const data = await response.json().catch(() => ({ error: "OAuth callback failed" }))
     return NextResponse.json(data, { status: response.status })
-    
+
   } catch (error) {
     console.error("[outlook/callback] OAuth error:", error)
     return NextResponse.redirect('/account?error=outlook_auth_failed&message=server_error')

@@ -96,7 +96,7 @@ export function GeneralChatInterface({ initialProjects }: GeneralChatInterfacePr
     if (project.indexingStatus === 'failed') {
       return
     }
-    
+
     setCurrentProject(project)
     router.push(`/project/${project.id}`)
   }
@@ -244,7 +244,7 @@ export function GeneralChatInterface({ initialProjects }: GeneralChatInterfacePr
                     const isIndexing = project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started'
                     const isFailed = project.indexingStatus === 'failed'
                     const isReady = project.indexingStatus === 'completed' || (!project.indexingStatus && project.aiProjectId)
-                    
+
                     return (
                       <motion.button
                         key={project.id}
@@ -257,11 +257,10 @@ export function GeneralChatInterface({ initialProjects }: GeneralChatInterfacePr
                         transition={{ delay: 0.3 + index * 0.05, duration: 0.4 }}
                       >
                         <div className="flex items-start justify-between mb-3">
-                          <div className={`p-2.5 rounded-lg transition-colors ${
-                            isIndexing ? 'bg-accent/10' : 
-                            isFailed ? 'bg-red-500/10' : 
-                            'bg-accent/10 group-hover:bg-accent/20'
-                          }`}>
+                          <div className={`p-2.5 rounded-lg transition-colors ${isIndexing ? 'bg-accent/10' :
+                              isFailed ? 'bg-red-500/10' :
+                                'bg-accent/10 group-hover:bg-accent/20'
+                            }`}>
                             {isIndexing ? (
                               <Loader2 className="w-5 h-5 text-accent animate-spin" />
                             ) : isFailed ? (

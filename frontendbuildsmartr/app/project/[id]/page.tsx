@@ -22,9 +22,9 @@ async function prefetchProject(accessToken: string, projectId: string): Promise<
       // Next.js caching
       next: { revalidate: 60 },
     });
-    
+
     if (!response.ok) return null;
-    
+
     const data: ProjectResponse = await response.json();
     return toProject(data);
   } catch (error) {
@@ -47,7 +47,7 @@ export default async function ProjectPage({ params }: PageProps) {
 
   // If project not found on server, let client handle the redirect
   // (in case it's a newly created project not yet synced)
-  
+
   return (
     <Suspense fallback={<ProjectSkeleton />}>
       <ProjectPageClient projectId={projectId} initialProject={initialProject} />

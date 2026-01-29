@@ -21,7 +21,7 @@ export async function GET() {
     // Handle error responses
     const data = await response.json().catch(() => ({ error: "OAuth initiation failed" }))
     return NextResponse.json(data, { status: response.status })
-    
+
   } catch (error) {
     console.error("[outlook/route] OAuth error:", error)
     return NextResponse.json({ error: "Backend unavailable" }, { status: 503 })
