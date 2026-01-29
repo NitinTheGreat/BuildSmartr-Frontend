@@ -5,11 +5,13 @@ import type {
     StreamingEventType,
     StreamingSearchState,
     ThinkingEventData,
+    RewriteEventData,
     SourcesEventData,
     ChunkEventData,
     DoneEventData,
     ErrorEventData,
     SourceItem,
+    ChatContext,
 } from '@/types/streaming'
 
 // AI Backend URL - called directly for streaming (bypasses Database Backend buffering)
@@ -22,44 +24,51 @@ const initialState: StreamingSearchState = {
     chunksRetrieved: 0,
     streamedContent: '',
     error: null,
+    rewriteInfo: null,
     stats: null,
 }
 
-// Return type for streamSearch - includes both content and sources
+// Return type for streamSearch - includes content, sources, and rewrite info
 export interface StreamSearchResult {
     content: string
     sources: SourceItem[]
+    rewriteInfo: {
+        original: string
+        standalone: string
+        wasRewritten: boolean
+    } | null
 }
 
 interface UseStreamingSearchReturn extends StreamingSearchState {
-    streamSearch: (projectId: string, question: string, topK?: number) => Promise<StreamSearchResult>
+    streamSearch: (chatId: string, question: string, topK?: number) => Promise<StreamSearchResult>
     abort: () => void
     reset: () => void
 }
 
 /**
- * Hook for handling SSE streaming search requests
+ * Hook for handling SSE streaming search requests with conversation memory.
  * 
- * ARCHITECTURE: Frontend calls AI Backend DIRECTLY for streaming search.
- * This bypasses the Database Backend proxy to avoid response buffering.
+ * ARCHITECTURE: 
+ * 1. Frontend calls Database Backend to get chat context (summary + recent messages)
+ * 2. Frontend calls AI Backend DIRECTLY with context for streaming
  * 
- * Flow:
- * 1. Get ai_project_id from Database Backend (via /api/projects/{id})
- * 2. Call AI Backend directly with ai_project_id for streaming
- * 
- * This gives us true real-time token streaming like ChatGPT/Perplexity.
+ * This enables Claude-like follow-up question handling:
+ * - "What about the second one?" gets resolved to "What is the amount of Invoice INV-1043?"
+ * - The AI has context of the conversation to give consistent answers
  */
 export function useStreamingSearch(): UseStreamingSearchReturn {
     const [state, setState] = useState<StreamingSearchState>(initialState)
     const abortControllerRef = useRef<AbortController | null>(null)
-    // Cache ai_project_id to avoid repeated lookups
-    const aiProjectIdCache = useRef<Map<string, string>>(new Map())
-    // Collect sources during streaming to return them with the result
+    // Cache contexts to avoid repeated lookups within the same session
+    const contextCache = useRef<Map<string, ChatContext>>(new Map())
+    // Collect sources and rewrite info during streaming
     const collectedSourcesRef = useRef<SourceItem[]>([])
+    const rewriteInfoRef = useRef<StreamSearchResult['rewriteInfo']>(null)
 
     const reset = useCallback(() => {
         setState(initialState)
         collectedSourcesRef.current = []
+        rewriteInfoRef.current = null
     }, [])
 
     const abort = useCallback(() => {
@@ -70,8 +79,45 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
         setState(prev => ({ ...prev, isStreaming: false }))
     }, [])
 
+    /**
+     * Fetch chat context from Database Backend.
+     * This includes summary, recent messages, and project info.
+     */
+    const fetchChatContext = async (chatId: string): Promise<ChatContext | null> => {
+        // Check cache first
+        const cached = contextCache.current.get(chatId)
+        if (cached) {
+            return cached
+        }
+
+        try {
+            const response = await fetch(`/api/chats/${chatId}/context`)
+            if (!response.ok) {
+                console.warn('Failed to fetch chat context:', response.statusText)
+                return null
+            }
+            const context: ChatContext = await response.json()
+
+            // Cache for future requests in this session
+            // Note: We don't cache indefinitely since context changes with each message
+            contextCache.current.set(chatId, context)
+
+            return context
+        } catch (error) {
+            console.warn('Error fetching chat context:', error)
+            return null
+        }
+    }
+
+    /**
+     * Invalidate cached context for a chat (call after sending a message)
+     */
+    const invalidateContext = useCallback((chatId: string) => {
+        contextCache.current.delete(chatId)
+    }, [])
+
     const streamSearch = useCallback(async (
-        projectId: string,
+        chatId: string,
         question: string,
         topK: number = 30
     ): Promise<StreamSearchResult> => {
@@ -87,51 +133,51 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
         setState({
             ...initialState,
             isStreaming: true,
-            thinkingStatus: 'Connecting...',
+            thinkingStatus: 'Loading conversation context...',
         })
 
-        // Reset collected sources
+        // Reset collected data
         collectedSourcesRef.current = []
+        rewriteInfoRef.current = null
 
         let fullContent = ''
 
         try {
-            // Step 1: Get ai_project_id (check cache first)
-            let aiProjectId = aiProjectIdCache.current.get(projectId)
+            // Step 1: Get chat context (summary + recent messages + project info)
+            setState(prev => ({ ...prev, thinkingStatus: 'Loading conversation context...' }))
+            const context = await fetchChatContext(chatId)
 
-            if (!aiProjectId) {
-                setState(prev => ({ ...prev, thinkingStatus: 'Loading project...' }))
-
-                const projectRes = await fetch(`/api/projects/${projectId}`)
-                if (!projectRes.ok) {
-                    throw new Error('Failed to load project')
-                }
-                const projectData = await projectRes.json()
-                aiProjectId = projectData.ai_project_id
-
-                if (!aiProjectId) {
-                    throw new Error('Project has not been indexed yet. Please index your emails first.')
-                }
-
-                // Cache for future requests
-                aiProjectIdCache.current.set(projectId, aiProjectId)
+            if (!context) {
+                throw new Error('Failed to load chat context')
             }
 
-            console.log('🔍 [useStreamingSearch] Calling AI Backend directly:')
-            console.log('   ai_project_id:', aiProjectId)
-            console.log('   question:', question)
-            console.log('   top_k:', topK)
+            if (!context.ai_project_id) {
+                throw new Error('Project has not been indexed yet. Please index your emails first.')
+            }
 
-            // Step 2: Call AI Backend DIRECTLY (bypasses Database Backend buffering)
+            // Invalidate cache since we're about to add a new message
+            invalidateContext(chatId)
+
+            console.log('🔍 [useStreamingSearch] Calling AI Backend with conversation context:')
+            console.log('   ai_project_id:', context.ai_project_id)
+            console.log('   question:', question)
+            console.log('   has_summary:', !!context.summary)
+            console.log('   recent_messages:', context.recent_messages?.length || 0)
+
+            // Step 2: Call AI Backend DIRECTLY with conversation context
             const response = await fetch(`${AI_BACKEND_URL}/api/search_project_stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    project_id: aiProjectId,
+                    project_id: context.ai_project_id,
                     question,
                     top_k: topK,
+                    // NEW: Pass conversation context for follow-up handling
+                    summary: context.summary,
+                    recent_messages: context.recent_messages,
+                    project_name: context.project_name,
                 }),
                 signal: abortControllerRef.current.signal,
             })
@@ -180,17 +226,35 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
                                     break
                                 }
 
+                                // NEW: Handle rewrite event
+                                case 'rewrite': {
+                                    const rewriteData = data as RewriteEventData
+                                    const info = {
+                                        original: rewriteData.original,
+                                        standalone: rewriteData.standalone,
+                                        wasRewritten: rewriteData.was_rewritten,
+                                    }
+                                    rewriteInfoRef.current = info
+                                    setState(prev => ({
+                                        ...prev,
+                                        rewriteInfo: info,
+                                    }))
+                                    if (rewriteData.was_rewritten) {
+                                        console.log('🔄 Question rewritten:', rewriteData.original, '→', rewriteData.standalone)
+                                    }
+                                    break
+                                }
+
                                 case 'sources': {
                                     const sourcesData = data as SourcesEventData
                                     const sources = sourcesData.sources || []
                                     console.log('📚 Sources received:', sources.length)
-                                    // Store in ref for returning later (avoids closure issues)
                                     collectedSourcesRef.current = sources
                                     setState(prev => ({
                                         ...prev,
                                         sources,
                                         chunksRetrieved: sourcesData.chunks_retrieved,
-                                        thinkingStatus: null, // Clear thinking when sources arrive
+                                        thinkingStatus: null,
                                     }))
                                     break
                                 }
@@ -201,13 +265,21 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
                                     setState(prev => ({
                                         ...prev,
                                         streamedContent: fullContent,
-                                        thinkingStatus: null, // Clear thinking when content starts
+                                        thinkingStatus: null,
                                     }))
                                     break
                                 }
 
                                 case 'done': {
                                     const doneData = data as DoneEventData
+                                    // Capture rewrite info from done event if not already set
+                                    if (doneData.rewrite && !rewriteInfoRef.current) {
+                                        rewriteInfoRef.current = {
+                                            original: doneData.rewrite.original,
+                                            standalone: doneData.rewrite.standalone,
+                                            wasRewritten: doneData.rewrite.was_rewritten,
+                                        }
+                                    }
                                     setState(prev => ({
                                         ...prev,
                                         isStreaming: false,
@@ -249,18 +321,18 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
                 thinkingStatus: null,
             }))
 
-            // Return both content and sources
             return {
                 content: fullContent,
                 sources: collectedSourcesRef.current,
+                rewriteInfo: rewriteInfoRef.current,
             }
 
         } catch (error) {
             if (error instanceof Error && error.name === 'AbortError') {
-                // Request was aborted, don't treat as error
                 return {
                     content: fullContent,
                     sources: collectedSourcesRef.current,
+                    rewriteInfo: rewriteInfoRef.current,
                 }
             }
 
@@ -276,7 +348,7 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
         } finally {
             abortControllerRef.current = null
         }
-    }, [])
+    }, [invalidateContext])
 
     return {
         ...state,

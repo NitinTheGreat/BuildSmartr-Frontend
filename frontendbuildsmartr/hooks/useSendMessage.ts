@@ -210,7 +210,8 @@ export function useSendMessage(options: UseSendMessageOptions): UseSendMessageRe
       let streamResult: StreamSearchResult
 
       try {
-        streamResult = await streamSearch(projectId, content)
+        // Use chatId for conversation-aware search (enables follow-up questions)
+        streamResult = await streamSearch(currentChatId!, content)
         console.log('[useSendMessage] Streaming complete:', {
           contentLength: streamResult.content?.length || 0,
           sourcesCount: streamResult.sources?.length || 0,

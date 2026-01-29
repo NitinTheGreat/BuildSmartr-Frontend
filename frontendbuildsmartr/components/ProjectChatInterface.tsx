@@ -288,13 +288,12 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
       // DON'T clear optimistic message - let it stay visible until AI response starts
       // setOptimisticMessage(null) -- removed for better UX
 
-      // Use streaming search API
+      // Use streaming search API with conversation context
       try {
         // Clear optimistic message just before we start getting AI response
         setOptimisticMessage(null)
 
         // Check if project has been indexed - use database status (persists across sessions)
-        // Check if project has been indexed
         const hasBeenIndexed =
           project.indexingStatus === 'completed' ||  // Database status (persists)
           project.aiProjectId                        // Has AI project ID in DB
@@ -308,15 +307,43 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           return
         }
 
-        // Use project.id (Supabase UUID) - the Database Backend will handle the ai_project_id mapping
-        const aiResponse = await streamSearch(project.id, messageContent)
+        // NEW: Use chatId for conversation-aware search
+        // The hook fetches conversation context (summary + recent messages) automatically
+        const aiResponse = await streamSearch(chatId!, messageContent)
 
-        if (aiResponse) {
+        if (aiResponse && aiResponse.content) {
+          // Build sources for the assistant message (enhanced with rewrite info for debugging)
+          const sources = aiResponse.sources?.length > 0 ? {
+            retrieved: aiResponse.sources.map(s => ({
+              chunk_id: s.chunk_id,
+              file_id: s.file_id,
+              score: s.score,
+              page: s.page
+            })),
+            cited: aiResponse.sources.slice(0, 3).map(s => ({
+              chunk_id: s.chunk_id,
+              file_id: s.file_id,
+              page: s.page
+            })),
+            rewrite: aiResponse.rewriteInfo ? {
+              original: aiResponse.rewriteInfo.original,
+              standalone: aiResponse.rewriteInfo.standalone
+            } : undefined
+          } : undefined
+
           const assistantMessage = {
             role: 'assistant' as const,
-            content: aiResponse,
+            content: aiResponse.content,
+            sources,
           }
           addMessageToChat(project.id, chatId!, assistantMessage).catch(console.error)
+          
+          // Trigger summary update in background if needed (every ~8 messages)
+          // This is fire-and-forget - doesn't block the UI
+          fetch(`/api/chats/${chatId}/summary`, { method: 'POST' }).catch(() => {
+            // Silently ignore - summary updates are best-effort
+          })
+          
           resetStreaming()
         }
       } catch (streamError) {

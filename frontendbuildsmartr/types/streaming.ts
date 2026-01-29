@@ -3,11 +3,18 @@
  * These types correspond to events from /api/search_project_stream
  */
 
-export type StreamingEventType = 'thinking' | 'sources' | 'chunk' | 'done' | 'error'
+export type StreamingEventType = 'thinking' | 'rewrite' | 'sources' | 'chunk' | 'done' | 'error'
 
 // Individual event data types
 export interface ThinkingEventData {
     status: string
+}
+
+// NEW: Rewrite event data for follow-up question resolution
+export interface RewriteEventData {
+    original: string
+    standalone: string
+    was_rewritten: boolean
 }
 
 export interface SourceItem {
@@ -18,6 +25,8 @@ export interface SourceItem {
     sender: string
     timestamp: string
     subject: string
+    file_id?: string
+    page?: string | number
 }
 
 export interface SourcesEventData {
@@ -35,6 +44,12 @@ export interface DoneEventData {
     llm_time_ms: number
     total_time_ms: number
     chunks_retrieved?: number
+    // NEW: Include rewrite info in done event
+    rewrite?: {
+        original: string
+        standalone: string
+        was_rewritten: boolean
+    }
 }
 
 export interface ErrorEventData {
@@ -44,6 +59,7 @@ export interface ErrorEventData {
 // Union type for all event data
 export type StreamingEventData =
     | ThinkingEventData
+    | RewriteEventData
     | SourcesEventData
     | ChunkEventData
     | DoneEventData
@@ -63,9 +79,27 @@ export interface StreamingSearchState {
     chunksRetrieved: number
     streamedContent: string
     error: string | null
+    // NEW: Track rewrite info for debugging/display
+    rewriteInfo: {
+        original: string
+        standalone: string
+        wasRewritten: boolean
+    } | null
     stats: {
         searchTimeMs: number
         llmTimeMs: number
         totalTimeMs: number
     } | null
+}
+
+// NEW: Chat context from backend
+export interface ChatContext {
+    chat_id: string
+    project_id: string | null
+    ai_project_id: string | null
+    project_name: string | null
+    summary: string | null
+    recent_messages: Array<{ role: string; content: string }>
+    message_count: number
+    should_resummarize: boolean
 }

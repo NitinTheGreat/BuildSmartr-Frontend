@@ -73,7 +73,7 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
   }, [mutate])
 
   const createProject = useCallback(async (input: CreateProjectInput): Promise<Project> => {
-    const response = await postApi<ProjectResponse>(PROJECTS_KEY, {
+    const response = await postApi<ProjectResponse>("/projects", {
       name: input.name,
       description: input.description || "",
       company_address: input.companyAddress || "",
