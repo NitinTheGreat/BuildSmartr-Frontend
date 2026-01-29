@@ -31,6 +31,9 @@ interface ProjectContextType {
   deleteProject: (id: string) => Promise<void>
   setCurrentProject: (project: Project | null) => void
 
+  // NEW: Refresh function for new architecture
+  refreshProjects: () => Promise<void>
+
   // File management
   addFilesToProject: (projectId: string, files: File[], category: string) => Promise<void>
   removeFileFromProject: (projectId: string, fileId: string) => Promise<void>
@@ -38,8 +41,6 @@ interface ProjectContextType {
   // Project Chat management
   createChat: (projectId: string, title?: string) => Promise<ProjectChat>
   setCurrentChatId: (chatId: string | null) => void
-  loadChatMessages: (projectId: string, chatId: string) => Promise<void>
-  addMessageToChat: (projectId: string, chatId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => Promise<ChatMessage>
   updateChatTitle: (projectId: string, chatId: string, title: string) => Promise<void>
   deleteChat: (projectId: string, chatId: string) => Promise<void>
 
@@ -221,29 +222,9 @@ export function ProjectProvider({
     return newChat
   }, [refreshProjects])
 
-  const loadChatMessages = useCallback(async (projectId: string, chatId: string) => {
-    // Refresh projects to get the latest data including messages
-    await refreshProjects()
-  }, [refreshProjects])
-
-  const addMessageToChat = useCallback(async (
-    projectId: string,
-    chatId: string,
-    message: Omit<ChatMessage, 'id' | 'timestamp'>
-  ): Promise<ChatMessage> => {
-    const response = await postApi<MessageResponse>(`/chats/${chatId}/messages`, {
-      role: message.role,
-      content: message.content,
-      search_modes: message.searchModes,
-      sources: message.sources,  // Include sources for AI responses
-    })
-    const newMessage = toMessage(response)
-
-    // Refresh to get updated data
-    await refreshProjects()
-
-    return newMessage
-  }, [refreshProjects])
+  // NOTE: Message operations (loadChatMessages, addMessageToChat) have been moved to
+  // useChatMessages and useSendMessage hooks for the new architecture.
+  // Messages are no longer embedded in projects - they're fetched on-demand.
 
   const updateChatTitle = useCallback(async (projectId: string, chatId: string, title: string) => {
     await putApi(`/chats/${chatId}`, { title })
@@ -317,12 +298,11 @@ export function ProjectProvider({
       updateProject,
       deleteProject,
       setCurrentProject,
+      refreshProjects,
       addFilesToProject,
       removeFileFromProject,
       createChat,
       setCurrentChatId,
-      loadChatMessages,
-      addMessageToChat,
       updateChatTitle,
       deleteChat,
       loadGeneralChats,
