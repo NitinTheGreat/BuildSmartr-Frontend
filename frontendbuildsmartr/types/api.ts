@@ -44,12 +44,24 @@ export interface ChatResponse {
   updated_at: string
 }
 
+// Source item for AI responses (matches streaming.ts SourceItem)
+export interface MessageSourceResponse {
+  chunk_id: string
+  chunk_type: string
+  text: string
+  score: number
+  sender: string
+  timestamp: string
+  subject: string
+}
+
 export interface MessageResponse {
   id: string
   chat_id: string
   role: "user" | "assistant"
   content: string
   search_modes: string[] | null
+  sources?: MessageSourceResponse[] | null  // Sources for AI assistant responses
   timestamp: string
 }
 

@@ -1,19 +1,19 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
 import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip, MoreVertical, Ban, Loader2, Search, ExternalLink, Clock, User } from "lucide-react"
-import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile } from "@/types/project"
+import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile, MessageSource } from "@/types/project"
 import type { SourceItem } from "@/types/streaming"
 import { EditFilesModal } from "./EditFilesModal"
 import { ShareProjectModal } from "./ShareProjectModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
 import { useProjects } from "@/contexts/ProjectContext"
-import { useStreamingSearch } from "@/hooks/useStreamingSearch"
+import { useStreamingSearch, type StreamSearchResult } from "@/hooks/useStreamingSearch"
 import { useRouter } from "next/navigation"
 
 interface SearchModeOption {
@@ -29,6 +29,100 @@ const searchModeOptions: SearchModeOption[] = [
   { id: 'quotes', label: 'Quotes', icon: Quote },
   { id: 'pdf', label: 'PDF Search', icon: FileText, exclusive: true },
 ]
+
+// Collapsible sources component for historical messages
+function HistoricalSources({ sources, messageId }: { sources: MessageSource[], messageId: string }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [expandedSourceIndex, setExpandedSourceIndex] = useState<number | null>(null)
+
+  return (
+    <div className="mt-6 pt-4 border-t border-border/30">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <FileText className="w-4 h-4" />
+        <span className="font-medium">Sources ({sources.length})</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-3 overflow-x-auto pb-2 pt-4 scrollbar-hidden -mx-2 px-2">
+              {sources.map((source, i) => (
+                <button
+                  key={`${messageId}-source-${i}`}
+                  onClick={() => setExpandedSourceIndex(expandedSourceIndex === i ? null : i)}
+                  className="group flex-shrink-0 w-[240px] text-left p-3 bg-surface/30 hover:bg-surface/50 border border-border/30 hover:border-border/50 rounded-lg transition-all duration-200"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="flex items-center justify-center w-5 h-5 bg-accent/10 text-accent text-[10px] font-bold rounded">
+                      {i + 1}
+                    </span>
+                    <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${source.chunk_type === 'email_body'
+                      ? 'bg-blue-500/10 text-blue-400'
+                      : 'bg-purple-500/10 text-purple-400'
+                      }`}>
+                      {source.chunk_type === 'email_body' ? 'Email' : 'PDF'}
+                    </span>
+                  </div>
+
+                  {/* Subject */}
+                  <p className="text-xs font-medium text-foreground line-clamp-1 mb-1">
+                    {source.subject || 'Untitled'}
+                  </p>
+
+                  {/* Preview */}
+                  <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                    {source.text}
+                  </p>
+
+                  {/* Expanded content */}
+                  <AnimatePresence>
+                    {expandedSourceIndex === i && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="mt-2 pt-2 border-t border-border/30 overflow-hidden"
+                      >
+                        <p className="text-[11px] text-foreground/80 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">
+                          {source.text}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                          {source.sender && (
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {source.sender}
+                            </span>
+                          )}
+                          {source.timestamp && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {source.timestamp}
+                            </span>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 interface ProjectChatInterfaceProps {
   project: Project
@@ -49,12 +143,14 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  // Optimistic message - shown immediately when user sends
-  const [optimisticMessage, setOptimisticMessage] = useState<{ content: string; searchModes?: SearchMode[] } | null>(null)
+  // Pending messages - optimistic UI for instant feedback
+  const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
   // Message queue - messages waiting to be processed
   const [messageQueue, setMessageQueue] = useState<{ content: string; searchModes?: SearchMode[] }[]>([])
   // Track if we're currently processing a message
   const [isProcessing, setIsProcessing] = useState(false)
+  // Track the chat ID we're adding messages to (for optimistic UI)
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -66,7 +162,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const {
     currentChatId,
     setCurrentChatId,
-    loadChatMessages,
     createChat,
     addMessageToChat,
     updateChatTitle,
@@ -103,9 +198,54 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     })
   }, [])
 
-  const currentChat = project.chats.find(c => c.id === currentChatId)
-  const messages = currentChat?.messages || []
-  const isInChatView = !!currentChat
+  // Get current chat from project
+  const currentChat = useMemo(() => {
+    return project.chats.find(c => c.id === currentChatId)
+  }, [project.chats, currentChatId])
+
+  // Get backend messages from current chat
+  const backendMessages = currentChat?.messages || []
+
+  // SIMPLE MESSAGE LOGIC:
+  // - If we have pending messages, show backend + pending
+  // - Otherwise just show backend messages
+  // - EXCLUDE any pending AI message if we're currently showing it in the streaming UI
+  const messages = useMemo(() => {
+    let allMessages = backendMessages
+
+    if (pendingMessages.length > 0) {
+      // Avoid duplicates - only add pending messages not in backend
+      const backendIds = new Set(backendMessages.map(m => m.id))
+      const uniquePending = pendingMessages.filter(m => !backendIds.has(m.id))
+      allMessages = [...backendMessages, ...uniquePending]
+    }
+
+    // If we have streaming content, don't show the pending AI message (it's shown in streaming UI)
+    if (streamedContent && streamedContent.trim()) {
+      // Filter out any pending AI messages - they'll be shown in the streaming UI instead
+      return allMessages.filter(m => !m.id.startsWith('pending_ai_'))
+    }
+
+    return allMessages
+  }, [backendMessages, pendingMessages, streamedContent])
+
+  // We're in chat view if we have a currentChatId OR we're processing a new message
+  const isInChatView = !!currentChatId || pendingMessages.length > 0
+
+  // Track the chat we're currently adding messages to
+  const lastChatIdRef = useRef<string | null>(null)
+
+  // Clear pending messages ONLY when switching to a different chat
+  useEffect(() => {
+    if (currentChatId !== lastChatIdRef.current) {
+      // User switched to a different chat - clear pending
+      if (lastChatIdRef.current !== null) {
+        setPendingMessages([])
+        setActiveChatId(null)
+      }
+      lastChatIdRef.current = currentChatId
+    }
+  }, [currentChatId])
 
   // Auto-expand textarea based on content
   useEffect(() => {
@@ -219,10 +359,13 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     await createChat(project.id)
   }
 
-  const handleSelectChat = async (chatId: string) => {
+  const handleSelectChat = (chatId: string) => {
+    // Messages are already loaded in project.chats from SWR
+    // Just set the current chat ID to switch views
     setCurrentChatId(chatId)
-    // Load messages for the selected chat
-    await loadChatMessages(project.id, chatId)
+    // Clear any pending messages from previous chat
+    setPendingMessages([])
+    setActiveChatId(null)
   }
 
   const handleBackToProject = () => {
@@ -249,130 +392,244 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   }
 
   // Process a single message - handles backend communication
-  const processMessage = async (messageContent: string, modes: SearchMode[]) => {
+  // SMART APPROACH: Only await what's necessary, run saves in parallel with streaming
+  const processMessage = useCallback(async (messageContent: string, modes: SearchMode[]) => {
+    console.log('[processMessage] Starting with:', messageContent)
     setIsProcessing(true)
     resetStreaming()
 
+    // Generate temporary ID for pending message
+    const pendingId = `pending_user_${Date.now()}`
+    const userMessage: ChatMessage = {
+      id: pendingId,
+      role: 'user' as const,
+      content: messageContent,
+      timestamp: new Date(),
+      searchModes: modes.length > 0 ? modes : undefined,
+    }
+
+    // Track if user message was saved successfully
+    let userMessageSaved = false
+    let userMessageSavePromise: Promise<ChatMessage> | null = null
+
+    // Determine chat ID first
+    let chatId = currentChatId
+
     try {
-      // If no current chat, create one in background
-      let chatId = currentChatId
+      // STEP 1: If no current chat, create one first (MUST await - need chat ID)
       if (!chatId) {
-        // Need to wait for chat creation so we can use the ID
+        console.log('[processMessage] Creating new chat...')
         try {
           const newChat = await createChat(project.id, messageContent.slice(0, 50))
           chatId = newChat.id
+          console.log('[processMessage] Created chat:', chatId)
+          setActiveChatId(chatId)
         } catch (err) {
-          console.error('Failed to create chat:', err)
+          console.error('[processMessage] Failed to create chat:', err)
           setIsProcessing(false)
-          setOptimisticMessage(null)
           return
         }
+      } else {
+        console.log('[processMessage] Using existing chat:', chatId)
+        setActiveChatId(chatId)
       }
 
-      const userMessage = {
-        role: 'user' as const,
-        content: messageContent,
-        searchModes: modes.length > 0 ? modes : undefined,
+      // STEP 2: Add user message to pending state (instant UI feedback)
+      console.log('[processMessage] Adding user message to pending')
+      setPendingMessages(prev => [...prev, userMessage])
+
+      // Check if project has been indexed
+      const hasBeenIndexed =
+        project.indexingStatus === 'completed' ||
+        project.aiProjectId
+
+      console.log('[processMessage] Project indexed?', hasBeenIndexed, {
+        indexingStatus: project.indexingStatus,
+        aiProjectId: project.aiProjectId
+      })
+
+      if (!hasBeenIndexed) {
+        const errorMessage: ChatMessage = {
+          id: `pending_error_${Date.now()}`,
+          role: 'assistant' as const,
+          content: 'This project hasn\'t been indexed yet. Please index your emails first to enable AI search.',
+          timestamp: new Date(),
+        }
+        setPendingMessages(prev => [...prev, errorMessage])
+        // Await the error message save
+        try {
+          await addMessageToChat(project.id, chatId, userMessage)
+          await addMessageToChat(project.id, chatId, errorMessage)
+        } catch (err) {
+          console.error('[processMessage] Failed to save error message:', err)
+        }
+        setIsProcessing(false)
+        return
       }
 
-      // Save user message to backend (fire and forget for speed)
-      addMessageToChat(project.id, chatId, userMessage).catch(console.error)
+      // STEP 3: Start user message save AND streaming IN PARALLEL
+      // This is the key optimization - streaming doesn't wait for user message save
+      console.log('[processMessage] Starting parallel: user message save + streaming')
 
-      // Update chat title if it's the first message
+      userMessageSavePromise = addMessageToChat(project.id, chatId, userMessage)
+        .then(saved => {
+          userMessageSaved = true
+          console.log('[processMessage] User message saved successfully')
+          return saved
+        })
+        .catch(err => {
+          console.error('[processMessage] Failed to save user message (will retry):', err)
+          throw err
+        })
+
+      // Update chat title if it's the first message (fire and forget, not critical)
       const chat = project.chats.find(c => c.id === chatId)
       if (chat && chat.messages.length === 0) {
         updateChatTitle(project.id, chatId, messageContent.slice(0, 50)).catch(console.error)
       }
 
-      // DON'T clear optimistic message - let it stay visible until AI response starts
-      // setOptimisticMessage(null) -- removed for better UX
+      // STEP 4: Stream AI response (runs in parallel with user message save)
+      console.log('[processMessage] Starting stream search...')
+      let streamResult: StreamSearchResult | null = null
 
-      // Use streaming search API
       try {
-        // Clear optimistic message just before we start getting AI response
-        setOptimisticMessage(null)
-
-        // Check if project has been indexed - use database status (persists across sessions)
-        // Check if project has been indexed
-        const hasBeenIndexed =
-          project.indexingStatus === 'completed' ||  // Database status (persists)
-          project.aiProjectId                        // Has AI project ID in DB
-
-        if (!hasBeenIndexed) {
-          const errorMessage = {
-            role: 'assistant' as const,
-            content: 'This project hasn\'t been indexed yet. Please index your emails first to enable AI search.',
-          }
-          addMessageToChat(project.id, chatId!, errorMessage).catch(console.error)
-          return
-        }
-
-        // Use project.id (Supabase UUID) - the Database Backend will handle the ai_project_id mapping
-        const aiResponse = await streamSearch(project.id, messageContent)
-
-        if (aiResponse) {
-          const assistantMessage = {
-            role: 'assistant' as const,
-            content: aiResponse,
-          }
-          addMessageToChat(project.id, chatId!, assistantMessage).catch(console.error)
-          resetStreaming()
-        }
+        // streamSearch now returns { content, sources } - no closure issues!
+        streamResult = await streamSearch(project.id, messageContent)
+        console.log('[processMessage] Stream search completed:', {
+          contentLength: streamResult?.content?.length || 0,
+          sourcesCount: streamResult?.sources?.length || 0
+        })
       } catch (streamError) {
-        console.error('Streaming search error:', streamError)
-        const errorMessage = {
+        console.error('[processMessage] Streaming search error:', streamError)
+        const errorMessage: ChatMessage = {
+          id: `pending_error_${Date.now()}`,
           role: 'assistant' as const,
           content: `Sorry, I encountered an error while searching: ${streamError instanceof Error ? streamError.message : 'Unknown error'}. Please try again.`,
+          timestamp: new Date(),
         }
-        addMessageToChat(project.id, chatId!, errorMessage).catch(console.error)
+        setPendingMessages(prev => [...prev, errorMessage])
+
+        // Wait for user message to finish saving, then save error
+        try {
+          if (userMessageSavePromise) {
+            await userMessageSavePromise.catch(() => { })
+          }
+          await addMessageToChat(project.id, chatId, errorMessage)
+        } catch (err) {
+          console.error('[processMessage] Failed to save error message:', err)
+        }
+
+        resetStreaming()
+        setIsProcessing(false)
+        return
+      }
+
+      // STEP 5: Process AI response and save it (AWAIT to ensure it's saved)
+      if (streamResult && streamResult.content && streamResult.content.trim()) {
+        // Convert sources from streamSearch result format to MessageSource format
+        const sourcesToSave: MessageSource[] = (streamResult.sources || []).map(s => ({
+          chunk_id: s.chunk_id,
+          chunk_type: s.chunk_type,
+          text: s.text,
+          score: s.score,
+          sender: s.sender,
+          timestamp: s.timestamp,
+          subject: s.subject,
+        }))
+
+        const assistantMessage: ChatMessage = {
+          id: `pending_ai_${Date.now()}`,
+          role: 'assistant' as const,
+          content: streamResult.content,
+          timestamp: new Date(),
+          sources: sourcesToSave.length > 0 ? sourcesToSave : undefined,
+        }
+
+        console.log('[processMessage] Adding AI response to pending with', sourcesToSave.length, 'sources')
+        setPendingMessages(prev => [...prev, assistantMessage])
+
+        // STEP 6: Wait for user message to be saved (if it hasn't finished yet)
+        if (userMessageSavePromise && !userMessageSaved) {
+          try {
+            await userMessageSavePromise
+          } catch (err) {
+            // User message failed, retry once
+            console.log('[processMessage] Retrying user message save...')
+            try {
+              await addMessageToChat(project.id, chatId, userMessage)
+              userMessageSaved = true
+            } catch (retryErr) {
+              console.error('[processMessage] User message save retry failed:', retryErr)
+              // Continue anyway - AI response is more important
+            }
+          }
+        }
+
+        // STEP 7: Save AI response (AWAIT to ensure it's saved with sources)
+        try {
+          console.log('[processMessage] Saving AI message to database...')
+          await addMessageToChat(project.id, chatId, assistantMessage)
+          console.log('[processMessage] AI message saved successfully')
+        } catch (err) {
+          console.error('[processMessage] Failed to save AI message:', err)
+          // Retry once
+          try {
+            console.log('[processMessage] Retrying AI message save...')
+            await addMessageToChat(project.id, chatId, assistantMessage)
+            console.log('[processMessage] AI message saved on retry')
+          } catch (retryErr) {
+            console.error('[processMessage] AI message save retry failed:', retryErr)
+            // Message is still visible in pendingMessages, user can see it
+          }
+        }
+
+        // Clear streaming UI after a brief moment so message appears in history
+        setTimeout(() => {
+          resetStreaming()
+        }, 2000)
+      } else {
+        console.warn('[processMessage] AI response was empty!')
         resetStreaming()
       }
     } catch (error) {
-      console.error('Failed to process message:', error)
+      console.error('[processMessage] Failed to process message:', error)
     } finally {
+      console.log('[processMessage] Finishing up')
       setIsProcessing(false)
-      setOptimisticMessage(null)
+
       // Process next message in queue if any
       setMessageQueue(prev => {
         if (prev.length > 0) {
           const [next, ...rest] = prev
-          // Process next message immediately
-          requestAnimationFrame(() => {
-            setOptimisticMessage(next)
+          setTimeout(() => {
             processMessage(next.content, next.searchModes || [])
-          })
+          }, 100)
           return rest
         }
         return prev
       })
     }
-  }
+  }, [currentChatId, createChat, project.id, project.chats, project.indexingStatus, project.aiProjectId, addMessageToChat, updateChatTitle, streamSearch, resetStreaming])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim()) return
 
     const messageContent = query.trim()
     const modes = [...selectedModes]
 
-    // Use requestAnimationFrame for absolutely instant UI update
-    requestAnimationFrame(() => {
-      // Clear input IMMEDIATELY for snappy feel
-      setQuery("")
+    // Clear input IMMEDIATELY for snappy feel
+    setQuery("")
 
-      // If already processing, add to queue
-      if (isProcessing || isStreaming) {
-        setMessageQueue(prev => [...prev, { content: messageContent, searchModes: modes.length > 0 ? modes : undefined }])
-        return
-      }
+    // If already processing, add to queue
+    if (isProcessing || isStreaming) {
+      setMessageQueue(prev => [...prev, { content: messageContent, searchModes: modes.length > 0 ? modes : undefined }])
+      return
+    }
 
-      // Show message optimistically IMMEDIATELY
-      setOptimisticMessage({ content: messageContent, searchModes: modes.length > 0 ? modes : undefined })
-
-      // Process in background (non-blocking)
-      processMessage(messageContent, modes)
-    })
-  }
+    // Process message (this will add to pendingMessages immediately)
+    processMessage(messageContent, modes)
+  }, [query, selectedModes, isProcessing, isStreaming, processMessage])
 
 
   const getCategoryIcon = (category: string) => {
@@ -435,7 +692,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                   <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </button>
                 <div className="border-l border-border/50 pl-4">
-                  <h1 className="text-sm font-semibold text-foreground line-clamp-1">{currentChat.title}</h1>
+                  <h1 className="text-sm font-semibold text-foreground line-clamp-1">{currentChat?.title || 'New Chat'}</h1>
                   <p className="text-xs text-muted-foreground/70 mt-0.5">{project.name}</p>
                 </div>
               </div>
@@ -489,23 +746,15 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                         prose-blockquote:border-l-accent prose-blockquote:bg-accent/5 prose-blockquote:py-1 prose-blockquote:not-italic">
                         <MarkdownRenderer content={message.content} />
                       </div>
+
+                      {/* Sources for historical messages - Collapsible */}
+                      {message.sources && message.sources.length > 0 && (
+                        <HistoricalSources sources={message.sources} messageId={message.id} />
+                      )}
                     </div>
                   )}
                 </motion.div>
               ))}
-
-              {/* Optimistic message - shown immediately when user sends (but not if already in messages) */}
-              {optimisticMessage && !messages.some(m => m.role === 'user' && m.content === optimisticMessage.content) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-2"
-                >
-                  <h2 className="text-xl md:text-2xl font-semibold text-foreground leading-tight tracking-tight">
-                    {optimisticMessage.content}
-                  </h2>
-                </motion.div>
-              )}
 
               {/* Queued messages - subtle indicator */}
               {messageQueue.length > 0 && (

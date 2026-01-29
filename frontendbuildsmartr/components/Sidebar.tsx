@@ -30,7 +30,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const [projectMenuOpen, setProjectMenuOpen] = useState<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
-  const { projects, setCurrentProject, setCurrentChatId, generalChats, setCurrentGeneralChatId, deleteGeneralChat, deleteProject, isLoading } = useProjects()
+  const { projects, setCurrentProject, setCurrentChatId, deleteProject, isLoading } = useProjects()
 
   // Only listen for auth state changes (avatar/name updates)
   // Initial data is passed via props from server component to avoid duplicate auth calls
@@ -55,29 +55,43 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
   const handleProjectClick = (projectId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const project = projects.find(p => p.id === projectId)
-    if (project) {
-      // Check if project is still indexing
-      if (project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started') {
-        // Don't expand or navigate - just show a toast-like message
-        return
-      }
+    if (!project) return
 
-      // Check if project failed
-      if (project.indexingStatus === 'failed') {
-        // Could show error here, for now just don't expand
-        return
-      }
+    // Check if project is still indexing
+    const isIndexing = project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started'
+    const isFailed = project.indexingStatus === 'failed'
 
-      setCurrentProject(project)
-      // Toggle expanded state for this project
-      if (expandedProjectId === projectId) {
-        setExpandedProjectId(null)
-      } else {
-        setExpandedProjectId(projectId)
-        // Auto-expand sidebar when expanding a project
-        if (!isExpanded && !isMobileOpen) {
-          setIsExpanded(true)
-        }
+    if (isIndexing || isFailed) {
+      // Don't navigate for indexing/failed projects
+      return
+    }
+
+    // Navigate to project and set it as current
+    setCurrentProject(project)
+    setCurrentChatId(null)
+    router.push(`/project/${projectId}`)
+    closeMobileMenu()
+  }
+
+  const handleProjectExpand = (projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+
+    const isIndexing = project.indexingStatus === 'indexing' || project.indexingStatus === 'not_started'
+    const isFailed = project.indexingStatus === 'failed'
+
+    if (isIndexing || isFailed) return
+
+    setCurrentProject(project)
+    // Toggle expanded state for this project
+    if (expandedProjectId === projectId) {
+      setExpandedProjectId(null)
+    } else {
+      setExpandedProjectId(projectId)
+      // Auto-expand sidebar when expanding a project
+      if (!isExpanded && !isMobileOpen) {
+        setIsExpanded(true)
       }
     }
   }
@@ -326,7 +340,10 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                           >
                             <div className={`flex items-center ${isExpandedView ? 'gap-2' : 'justify-center'}`}>
                               {isExpandedView && (
-                                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                                <button
+                                  onClick={(e) => handleProjectExpand(project.id, e)}
+                                  className="w-4 h-4 flex items-center justify-center flex-shrink-0 hover:text-accent transition-colors"
+                                >
                                   {isReady && project.chats.length > 0 ? (
                                     isProjectExpanded ? (
                                       <ChevronDown className="w-3 h-3" />
@@ -334,7 +351,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                                       <ChevronRight className="w-3 h-3" />
                                     )
                                   ) : null}
-                                </span>
+                                </button>
                               )}
                               {/* Status icon */}
                               {isIndexing ? (
@@ -346,13 +363,7 @@ export function Sidebar({ initialAvatarUrl = null, initialFirstName = null }: Si
                               )}
                               {isExpandedView && (
                                 <>
-                                  <span
-                                    className={`text-sm truncate flex-1 ${isIndexing ? 'italic' : ''}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleProjectNavigate(project.id)
-                                    }}
-                                  >
+                                  <span className={`text-sm truncate flex-1 ${isIndexing ? 'italic' : ''}`}>
                                     {project.name}
                                     {isIndexing && <span className="text-xs text-muted-foreground ml-1">(syncing)</span>}
                                     {isFailed && <span className="text-xs text-red-400 ml-1">(failed)</span>}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useProjects } from "@/contexts/ProjectContext"
 import { ProjectChatInterface } from "@/components/ProjectChatInterface"
@@ -16,67 +16,32 @@ interface ProjectPageClientProps {
 
 export function ProjectPageClient({ projectId, initialProject }: ProjectPageClientProps) {
   const router = useRouter()
-  const { projects, currentProject, setCurrentProject, loadProject, isLoading: isContextLoading } = useProjects()
-  const [isPageLoading, setIsPageLoading] = useState(!initialProject)
-  const hasLoadedRef = useRef(false)
+  const { projects, setCurrentProject, isLoading: isContextLoading } = useProjects()
+  const hasInitializedRef = useRef(false)
 
-  // Use initial project immediately for instant render
-  const displayProject = currentProject?.id === projectId 
-    ? currentProject 
-    : initialProject
+  // Find project in context (prioritize context over initial)
+  const projectFromContext = projects.find(p => p.id === projectId)
+  const displayProject = projectFromContext || initialProject
 
+  // Set current project on mount (only once)
   useEffect(() => {
-    // Prevent duplicate loads
-    if (hasLoadedRef.current) return
-
-    const initializeProject = async () => {
-      // If we have initial data, set it immediately
-      if (initialProject && !currentProject) {
-        setCurrentProject(initialProject)
-      }
-
-      // Check if we already have this project in the list
-      const existingProject = projects.find(p => p.id === projectId)
-      
-      // If context is still doing initial load and we don't have the project yet, wait
-      if (isContextLoading && !existingProject && !initialProject) {
-        return
-      }
-
-      hasLoadedRef.current = true
-
-      // If we don't have initial data, load from API
-      if (!initialProject) {
-        setIsPageLoading(true)
-        const fullProject = await loadProject(projectId)
-
-        if (fullProject) {
-          setCurrentProject(fullProject)
-        } else {
-          // Project not found, redirect to home
-          router.push('/')
-          return
-        }
-        setIsPageLoading(false)
-      } else {
-        // We have initial data, but still load fresh data in background
-        loadProject(projectId).then(fullProject => {
-          if (fullProject) {
-            setCurrentProject(fullProject)
-          }
-        })
-      }
+    if (hasInitializedRef.current) return
+    
+    if (displayProject) {
+      hasInitializedRef.current = true
+      setCurrentProject(displayProject)
     }
+  }, [displayProject, setCurrentProject])
 
-    initializeProject()
-  }, [projectId, projects, isContextLoading, loadProject, setCurrentProject, router, initialProject, currentProject])
+  // Handle project not found (only after context has loaded)
+  useEffect(() => {
+    if (!isContextLoading && projects.length > 0 && !displayProject) {
+      // Project not found after context loaded, redirect to home
+      router.push('/')
+    }
+  }, [isContextLoading, projects.length, displayProject, router])
 
-  // Show loading state only if we don't have any project data
-  if (isPageLoading && !displayProject) {
-    return <ProjectSkeleton />
-  }
-
-  // If we still don't have a project to display, show loading
+  // Show loading while we don't have project data
   if (!displayProject) {
     return <ProjectSkeleton />
   }

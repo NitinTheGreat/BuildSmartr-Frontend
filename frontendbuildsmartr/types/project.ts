@@ -31,12 +31,24 @@ export interface ProjectFile {
   url?: string
 }
 
+// Source item for AI responses
+export interface MessageSource {
+  chunk_id: string
+  chunk_type: string
+  text: string
+  score: number
+  sender: string
+  timestamp: string
+  subject: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
   searchModes?: SearchMode[]
+  sources?: MessageSource[]  // Sources for AI assistant responses
 }
 
 export interface ProjectChat {

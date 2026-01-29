@@ -9,6 +9,7 @@ import type {
     ChunkEventData,
     DoneEventData,
     ErrorEventData,
+    SourceItem,
 } from '@/types/streaming'
 
 // AI Backend URL - called directly for streaming (bypasses Database Backend buffering)
@@ -24,8 +25,14 @@ const initialState: StreamingSearchState = {
     stats: null,
 }
 
+// Return type for streamSearch - includes both content and sources
+export interface StreamSearchResult {
+    content: string
+    sources: SourceItem[]
+}
+
 interface UseStreamingSearchReturn extends StreamingSearchState {
-    streamSearch: (projectId: string, question: string, topK?: number) => Promise<string>
+    streamSearch: (projectId: string, question: string, topK?: number) => Promise<StreamSearchResult>
     abort: () => void
     reset: () => void
 }
@@ -47,9 +54,12 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
     const abortControllerRef = useRef<AbortController | null>(null)
     // Cache ai_project_id to avoid repeated lookups
     const aiProjectIdCache = useRef<Map<string, string>>(new Map())
+    // Collect sources during streaming to return them with the result
+    const collectedSourcesRef = useRef<SourceItem[]>([])
 
     const reset = useCallback(() => {
         setState(initialState)
+        collectedSourcesRef.current = []
     }, [])
 
     const abort = useCallback(() => {
@@ -64,7 +74,7 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
         projectId: string,
         question: string,
         topK: number = 30
-    ): Promise<string> => {
+    ): Promise<StreamSearchResult> => {
         // Abort any existing request
         if (abortControllerRef.current) {
             abortControllerRef.current.abort()
@@ -79,6 +89,9 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
             isStreaming: true,
             thinkingStatus: 'Connecting...',
         })
+
+        // Reset collected sources
+        collectedSourcesRef.current = []
 
         let fullContent = ''
 
@@ -169,10 +182,13 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
 
                                 case 'sources': {
                                     const sourcesData = data as SourcesEventData
-                                    console.log('📚 Sources received:', sourcesData.sources?.length || 0)
+                                    const sources = sourcesData.sources || []
+                                    console.log('📚 Sources received:', sources.length)
+                                    // Store in ref for returning later (avoids closure issues)
+                                    collectedSourcesRef.current = sources
                                     setState(prev => ({
                                         ...prev,
-                                        sources: sourcesData.sources || [],
+                                        sources,
                                         chunksRetrieved: sourcesData.chunks_retrieved,
                                         thinkingStatus: null, // Clear thinking when sources arrive
                                     }))
@@ -233,12 +249,19 @@ export function useStreamingSearch(): UseStreamingSearchReturn {
                 thinkingStatus: null,
             }))
 
-            return fullContent
+            // Return both content and sources
+            return {
+                content: fullContent,
+                sources: collectedSourcesRef.current,
+            }
 
         } catch (error) {
             if (error instanceof Error && error.name === 'AbortError') {
                 // Request was aborted, don't treat as error
-                return fullContent
+                return {
+                    content: fullContent,
+                    sources: collectedSourcesRef.current,
+                }
             }
 
             const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'

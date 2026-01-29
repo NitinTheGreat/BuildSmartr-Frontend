@@ -2,21 +2,12 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 import type { Project, ProjectFile, ProjectChat, ChatMessage, GeneralChat } from "@/types/project"
-import type { ProjectResponse, ChatResponse, MessageResponse } from "@/types/api"
 import { createClient } from "@/utils/supabase/client"
 import { OfflineModal } from "@/components/OfflineModal"
-import {
-  fetchApi,
-  postApi,
-  putApi,
-  deleteApi,
-  toProject,
-  toProjectFile,
-  toProjectChat,
-  toGeneralChat,
-  toMessage,
-  isConnectionError
-} from "@/lib/api"
+import { useProjects as useSWRProjects, useProject as useSWRProject, invalidateProjects } from "@/hooks/useProjects"
+import { useGeneralChats as useSWRGeneralChats, useChatMessages, invalidateChats } from "@/hooks/useChats"
+import { postApi, putApi, deleteApi, toProjectChat, toMessage } from "@/lib/api"
+import type { ChatResponse, MessageResponse } from "@/types/api"
 
 // ============================================
 // Context Interface (backward compatible)
@@ -76,131 +67,100 @@ interface ProjectProviderProps {
 }
 
 // ============================================
-// Provider Component
+// Provider Component - Now powered by SWR
 // ============================================
 
 export function ProjectProvider({
   children,
   initialProjects,
-  initialGeneralChats
 }: ProjectProviderProps) {
-  // Core state
-  const [projects, setProjects] = useState<Project[]>(initialProjects || [])
+  // SWR hooks for data fetching (SINGLE SOURCE OF TRUTH)
+  const {
+    projects,
+    isLoading: isProjectsLoading,
+    error: projectsError,
+    refresh: refreshProjects,
+    createProject: swrCreateProject,
+    updateProject: swrUpdateProject,
+    deleteProject: swrDeleteProject,
+    addFiles: swrAddFiles,
+    removeFile: swrRemoveFile,
+  } = useSWRProjects({ fallbackData: initialProjects })
+
+  const {
+    chats: generalChats,
+    isLoading: isChatsLoading,
+    refresh: refreshGeneralChats,
+    createChat: swrCreateGeneralChat,
+    deleteChat: swrDeleteGeneralChat,
+    updateChatTitle: swrUpdateGeneralChatTitle,
+  } = useSWRGeneralChats()
+
+  // Local UI state only (not data!)
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
-  const [generalChats, setGeneralChats] = useState<GeneralChat[]>(initialGeneralChats || [])
   const [currentGeneralChatId, setCurrentGeneralChatId] = useState<string | null>(null)
-
-  // Loading/error state
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(!!initialProjects)
   const [showOfflineModal, setShowOfflineModal] = useState(false)
 
-  // Error handler
-  const handleError = useCallback((err: unknown, fallbackMessage: string) => {
-    if (isConnectionError(err)) {
-      setShowOfflineModal(true)
-      return
-    }
-    console.error(fallbackMessage, err)
-    setError(err instanceof Error ? err.message : fallbackMessage)
-  }, [])
+  // Combined loading/error state
+  const isLoading = isProjectsLoading || isChatsLoading
+  const error = projectsError?.message || null
 
-  // Retry handler for offline modal
-  const handleRetry = useCallback(() => {
-    loadProjects()
-    loadGeneralChats()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Auth state listener - load data on sign in
+  // Sync currentProject with latest data from SWR (only if data changed)
   useEffect(() => {
-    // Skip if we have initial data from server
-    if (initialProjects) return
-
-    const supabase = createClient()
-    let isMounted = true
-
-    const loadAllData = async () => {
-      if (hasLoadedInitialData) return
-
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session && isMounted) {
-        setHasLoadedInitialData(true)
-        setIsLoading(true)
-        try {
-          await Promise.all([loadProjects(), loadGeneralChats()])
-        } catch (err) {
-          console.error("Error loading initial data:", err)
-        } finally {
-          if (isMounted) setIsLoading(false)
-        }
+    if (currentProject && projects.length > 0) {
+      const updated = projects.find(p => p.id === currentProject.id)
+      if (!updated) {
+        // Project was deleted
+        setCurrentProject(null)
+        setCurrentChatId(null)
       }
+      // Don't update if found - it causes unnecessary re-renders
+      // The projects array from SWR is already the source of truth
     }
+  }, [projects, currentProject?.id])
 
-    loadAllData()
+  // Auth state listener
+  useEffect(() => {
+    const supabase = createClient()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return
-
-      if (session && event === 'SIGNED_IN' && !hasLoadedInitialData) {
-        setHasLoadedInitialData(true)
-        setIsLoading(true)
-        try {
-          await Promise.all([loadProjects(), loadGeneralChats()])
-        } catch (err) {
-          console.error("Error loading data after sign in:", err)
-        } finally {
-          if (isMounted) setIsLoading(false)
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setProjects([])
-        setGeneralChats([])
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_OUT') {
         setCurrentProject(null)
         setCurrentChatId(null)
         setCurrentGeneralChatId(null)
-        setHasLoadedInitialData(false)
-        setIsLoading(false)
+        invalidateProjects()
+        invalidateChats()
       }
     })
 
     return () => {
-      isMounted = false
       subscription.unsubscribe()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProjects])
+  }, [])
+
+  // Retry handler for offline modal
+  const handleRetry = useCallback(() => {
+    refreshProjects()
+    refreshGeneralChats()
+  }, [refreshProjects, refreshGeneralChats])
 
   // ============================================
   // Project Operations
   // ============================================
 
   const loadProjects = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const data = await fetchApi<ProjectResponse[]>("/projects")
-      setProjects(data.map(toProject))
-    } catch (err) {
-      handleError(err, "Failed to load projects")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [handleError])
+    await refreshProjects()
+  }, [refreshProjects])
 
   const loadProject = useCallback(async (projectId: string): Promise<Project | null> => {
-    try {
-      setError(null)
-      const data = await fetchApi<ProjectResponse>(`/projects/${projectId}`)
-      const project = toProject(data)
-      setProjects(prev => prev.map(p => p.id === projectId ? project : p))
-      return project
-    } catch (err) {
-      handleError(err, "Failed to load project")
-      return null
-    }
-  }, [handleError])
+    // Use SWR's mutate to refresh and get the latest data
+    await refreshProjects()
+    // Return the project from the current projects array
+    // Note: We access projects via closure, but don't add to deps to avoid recreating the function
+    const found = projects.find(p => p.id === projectId)
+    return found || null
+  }, [refreshProjects]) // Intentionally not including 'projects' to keep function stable
 
   const createProject = useCallback(async (
     name: string,
@@ -209,306 +169,134 @@ export function ProjectProvider({
     tags: string[],
     files: File[]
   ): Promise<Project> => {
-    setError(null)
-    const data = await postApi<ProjectResponse>("/projects", {
+    const newProject = await swrCreateProject({
       name,
       description,
-      company_address: companyAddress,
+      companyAddress,
       tags,
+      files,
     })
-    const newProject = toProject(data)
-
-    // Upload files if any
-    if (files.length > 0) {
-      const uploadedFiles: ProjectFile[] = []
-      for (const file of files) {
-        try {
-          const formData = new FormData()
-          formData.append("file", file)
-          formData.append("category", "other")
-          const response = await fetch(`/api/projects/${newProject.id}/files`, {
-            method: "POST",
-            body: formData,
-          })
-          if (response.ok) {
-            const fileData = await response.json()
-            uploadedFiles.push(toProjectFile(fileData))
-          }
-        } catch (fileErr) {
-          console.error("Failed to upload file:", file.name, fileErr)
-        }
-      }
-      newProject.files = uploadedFiles
-    }
-
-    setProjects(prev => [newProject, ...prev])
     return newProject
-  }, [])
+  }, [swrCreateProject])
 
   const updateProject = useCallback(async (
     id: string,
     updates: Partial<Pick<Project, 'name' | 'description' | 'companyAddress' | 'tags'>>
   ) => {
-    setError(null)
-    await putApi(`/projects/${id}`, {
-      name: updates.name,
-      description: updates.description,
-      company_address: updates.companyAddress,
-      tags: updates.tags,
-    })
-
-    setProjects(prev => prev.map(p =>
-      p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
-    ))
-
-    if (currentProject?.id === id) {
-      setCurrentProject(prev => prev ? { ...prev, ...updates, updatedAt: new Date() } : null)
-    }
-  }, [currentProject])
+    await swrUpdateProject(id, updates)
+  }, [swrUpdateProject])
 
   const deleteProject = useCallback(async (id: string) => {
-    setError(null)
-    
-    // Optimistically remove from UI
-    setProjects(prev => prev.filter(p => p.id !== id))
     if (currentProject?.id === id) {
       setCurrentProject(null)
       setCurrentChatId(null)
     }
-    
-    // Actually delete on server
-    await deleteApi(`/projects/${id}`)
-    
-    // Refresh projects list to ensure sync with server
-    // This handles edge cases where optimistic update might be wrong
-    try {
-      const data = await fetchApi<ProjectResponse[]>("/projects")
-      setProjects(data.map(toProject))
-    } catch (err) {
-      // Ignore refresh errors - deletion already succeeded
-      console.warn("Failed to refresh projects after delete:", err)
-    }
-  }, [currentProject])
+    await swrDeleteProject(id)
+  }, [swrDeleteProject, currentProject?.id])
 
   // ============================================
   // File Operations
   // ============================================
 
   const addFilesToProject = useCallback(async (projectId: string, files: File[], category: string) => {
-    setError(null)
-    const uploadedFiles: ProjectFile[] = []
-
-    for (const file of files) {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("category", category)
-      const response = await fetch(`/api/projects/${projectId}/files`, {
-        method: "POST",
-        body: formData,
-      })
-      if (!response.ok) throw new Error("Upload failed")
-      const data = await response.json()
-      uploadedFiles.push(toProjectFile(data))
-    }
-
-    setProjects(prev => prev.map(p =>
-      p.id === projectId
-        ? { ...p, files: [...p.files, ...uploadedFiles], updatedAt: new Date() }
-        : p
-    ))
-
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev
-        ? { ...prev, files: [...prev.files, ...uploadedFiles], updatedAt: new Date() }
-        : null
-      )
-    }
-  }, [currentProject])
+    await swrAddFiles(projectId, files, category)
+  }, [swrAddFiles])
 
   const removeFileFromProject = useCallback(async (projectId: string, fileId: string) => {
-    setError(null)
-    await deleteApi(`/projects/${projectId}/files/${fileId}`)
-
-    setProjects(prev => prev.map(p =>
-      p.id === projectId
-        ? { ...p, files: p.files.filter(f => f.id !== fileId), updatedAt: new Date() }
-        : p
-    ))
-
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev
-        ? { ...prev, files: prev.files.filter(f => f.id !== fileId), updatedAt: new Date() }
-        : null
-      )
-    }
-  }, [currentProject])
+    await swrRemoveFile(projectId, fileId)
+  }, [swrRemoveFile])
 
   // ============================================
   // Project Chat Operations
   // ============================================
 
   const createChat = useCallback(async (projectId: string, title?: string): Promise<ProjectChat> => {
-    setError(null)
-    const data = await postApi<ChatResponse>(`/projects/${projectId}/chats`, { title })
-    const newChat = toProjectChat(data)
+    const response = await postApi<ChatResponse>(`/projects/${projectId}/chats`, { title })
+    const newChat = toProjectChat(response)
 
-    setProjects(prev => prev.map(p =>
-      p.id === projectId
-        ? { ...p, chats: [newChat, ...p.chats], updatedAt: new Date() }
-        : p
-    ))
-
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev
-        ? { ...prev, chats: [newChat, ...prev.chats], updatedAt: new Date() }
-        : null
-      )
-    }
+    // Refresh to get updated data
+    await refreshProjects()
 
     setCurrentChatId(newChat.id)
     return newChat
-  }, [currentProject])
+  }, [refreshProjects])
 
   const loadChatMessages = useCallback(async (projectId: string, chatId: string) => {
-    setError(null)
-    const data = await fetchApi<MessageResponse[]>(`/chats/${chatId}/messages`)
-    const messages = data.map(toMessage)
-
-    const updateChats = (chats: ProjectChat[]) =>
-      chats.map(c => c.id === chatId ? { ...c, messages, messageCount: messages.length } : c)
-
-    setProjects(prev => prev.map(p =>
-      p.id === projectId ? { ...p, chats: updateChats(p.chats) } : p
-    ))
-
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev ? { ...prev, chats: updateChats(prev.chats) } : null)
-    }
-  }, [currentProject])
+    // Refresh projects to get the latest data including messages
+    await refreshProjects()
+  }, [refreshProjects])
 
   const addMessageToChat = useCallback(async (
     projectId: string,
     chatId: string,
     message: Omit<ChatMessage, 'id' | 'timestamp'>
   ): Promise<ChatMessage> => {
-    setError(null)
-    const data = await postApi<MessageResponse>(`/chats/${chatId}/messages`, {
+    const response = await postApi<MessageResponse>(`/chats/${chatId}/messages`, {
       role: message.role,
       content: message.content,
       search_modes: message.searchModes,
+      sources: message.sources,  // Include sources for AI responses
     })
-    const newMessage = toMessage(data)
+    const newMessage = toMessage(response)
 
-    const updateChats = (chats: ProjectChat[]) =>
-      chats.map(c => c.id === chatId
-        ? { ...c, messages: [...c.messages, newMessage], messageCount: c.messageCount + 1, updatedAt: new Date() }
-        : c
-      )
-
-    setProjects(prev => prev.map(p =>
-      p.id === projectId ? { ...p, chats: updateChats(p.chats), updatedAt: new Date() } : p
-    ))
-
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev ? { ...prev, chats: updateChats(prev.chats), updatedAt: new Date() } : null)
-    }
+    // Refresh to get updated data
+    await refreshProjects()
 
     return newMessage
-  }, [currentProject])
+  }, [refreshProjects])
 
   const updateChatTitle = useCallback(async (projectId: string, chatId: string, title: string) => {
-    setError(null)
     await putApi(`/chats/${chatId}`, { title })
-
-    const updateChats = (chats: ProjectChat[]) =>
-      chats.map(c => c.id === chatId ? { ...c, title, updatedAt: new Date() } : c)
-
-    setProjects(prev => prev.map(p =>
-      p.id === projectId ? { ...p, chats: updateChats(p.chats), updatedAt: new Date() } : p
-    ))
-
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev ? { ...prev, chats: updateChats(prev.chats), updatedAt: new Date() } : null)
-    }
-  }, [currentProject])
+    await refreshProjects()
+  }, [refreshProjects])
 
   const deleteChat = useCallback(async (projectId: string, chatId: string) => {
-    setError(null)
     await deleteApi(`/chats/${chatId}`)
-
-    const filterChats = (chats: ProjectChat[]) => chats.filter(c => c.id !== chatId)
-
-    setProjects(prev => prev.map(p =>
-      p.id === projectId ? { ...p, chats: filterChats(p.chats), updatedAt: new Date() } : p
-    ))
-
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev ? { ...prev, chats: filterChats(prev.chats), updatedAt: new Date() } : null)
-    }
-
     if (currentChatId === chatId) setCurrentChatId(null)
-  }, [currentProject, currentChatId])
+    await refreshProjects()
+  }, [currentChatId, refreshProjects])
 
   // ============================================
   // General Chat Operations
   // ============================================
 
   const loadGeneralChats = useCallback(async () => {
-    try {
-      setError(null)
-      const data = await fetchApi<ChatResponse[]>("/chats")
-      setGeneralChats(data.map(toGeneralChat))
-    } catch (err) {
-      handleError(err, "Failed to load general chats")
-    }
-  }, [handleError])
+    await refreshGeneralChats()
+  }, [refreshGeneralChats])
 
   const createGeneralChat = useCallback(async (title?: string): Promise<GeneralChat> => {
-    setError(null)
-    const data = await postApi<ChatResponse>("/chats", { title })
-    const newChat = toGeneralChat(data)
-    setGeneralChats(prev => [newChat, ...prev])
+    const newChat = await swrCreateGeneralChat(title)
     setCurrentGeneralChatId(newChat.id)
     setCurrentProject(null)
     setCurrentChatId(null)
     return newChat
-  }, [])
+  }, [swrCreateGeneralChat])
 
   const addMessageToGeneralChat = useCallback(async (
     chatId: string,
     message: Omit<ChatMessage, 'id' | 'timestamp'>
   ): Promise<ChatMessage> => {
-    setError(null)
-    const data = await postApi<MessageResponse>(`/chats/${chatId}/messages`, {
+    const response = await postApi<MessageResponse>(`/chats/${chatId}/messages`, {
       role: message.role,
       content: message.content,
       search_modes: message.searchModes,
     })
-    const newMessage = toMessage(data)
+    const newMessage = toMessage(response)
 
-    setGeneralChats(prev => prev.map(c =>
-      c.id === chatId
-        ? { ...c, messages: [...c.messages, newMessage], messageCount: c.messageCount + 1, updatedAt: new Date() }
-        : c
-    ))
+    // Refresh to get updated data
+    await refreshGeneralChats()
 
     return newMessage
-  }, [])
+  }, [refreshGeneralChats])
 
   const updateGeneralChatTitle = useCallback(async (chatId: string, title: string) => {
-    setError(null)
-    await putApi(`/chats/${chatId}`, { title })
-    setGeneralChats(prev => prev.map(c =>
-      c.id === chatId ? { ...c, title, updatedAt: new Date() } : c
-    ))
-  }, [])
+    await swrUpdateGeneralChatTitle(chatId, title)
+  }, [swrUpdateGeneralChatTitle])
 
   const deleteGeneralChat = useCallback(async (chatId: string) => {
-    setError(null)
-    await deleteApi(`/chats/${chatId}`)
-    setGeneralChats(prev => prev.filter(c => c.id !== chatId))
+    await swrDeleteGeneralChat(chatId)
     if (currentGeneralChatId === chatId) setCurrentGeneralChatId(null)
-  }, [currentGeneralChatId])
+  }, [swrDeleteGeneralChat, currentGeneralChatId])
 
   // ============================================
   // Render

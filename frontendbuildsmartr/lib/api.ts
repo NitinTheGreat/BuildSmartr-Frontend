@@ -75,6 +75,7 @@ export function toMessage(res: MessageResponse): ChatMessage {
     content: res.content,
     timestamp: new Date(res.timestamp),
     searchModes: res.search_modes as ChatMessage['searchModes'] || undefined,
+    sources: res.sources || undefined,
   }
 }
 

@@ -2,17 +2,15 @@
 
 import useSWR, { mutate as globalMutate } from "swr"
 import { useCallback } from "react"
-import type { Project } from "@/types/project"
+import type { Project, ProjectFile } from "@/types/project"
 import type { ProjectResponse } from "@/types/api"
-import { swrFetcher, toProject, postApi, putApi, deleteApi } from "@/lib/api"
+import { swrFetcher, toProject, toProjectFile, postApi, putApi, deleteApi } from "@/lib/api"
 
 const PROJECTS_KEY = "/api/projects"
 
 interface UseProjectsOptions {
   /** Initial data from server-side prefetch */
   fallbackData?: Project[]
-  /** Revalidate on mount even if fallbackData is provided */
-  revalidateOnMount?: boolean
 }
 
 interface UseProjectsReturn {
@@ -28,6 +26,10 @@ interface UseProjectsReturn {
   updateProject: (id: string, updates: UpdateProjectInput) => Promise<void>
   /** Delete a project */
   deleteProject: (id: string) => Promise<void>
+  /** Add files to a project */
+  addFiles: (projectId: string, files: File[], category: string) => Promise<void>
+  /** Remove a file from a project */
+  removeFile: (projectId: string, fileId: string) => Promise<void>
 }
 
 interface CreateProjectInput {
@@ -35,6 +37,7 @@ interface CreateProjectInput {
   description?: string
   companyAddress?: string
   tags?: string[]
+  files?: File[]
 }
 
 interface UpdateProjectInput {
@@ -46,17 +49,19 @@ interface UpdateProjectInput {
 
 /**
  * SWR hook for fetching and managing projects
+ * Single source of truth: DATABASE
  */
 export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn {
-  const { fallbackData, revalidateOnMount = !fallbackData } = options
+  const { fallbackData } = options
 
   const { data, error, isLoading, isValidating, mutate } = useSWR<ProjectResponse[]>(
     PROJECTS_KEY,
     swrFetcher,
     {
       fallbackData: fallbackData ? fallbackData.map(projectToResponse) : undefined,
-      revalidateOnMount,
+      // Sensible defaults - avoid aggressive revalidation
       revalidateOnFocus: false,
+      revalidateOnReconnect: true,
       dedupingInterval: 5000,
     }
   )
@@ -77,37 +82,31 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
 
     const newProject = toProject(response)
 
-    // Optimistically add to cache
-    await mutate(
-      (current) => [response, ...(current || [])],
-      { revalidate: false }
-    )
+    // Upload files if any
+    if (input.files && input.files.length > 0) {
+      for (const file of input.files) {
+        try {
+          const formData = new FormData()
+          formData.append("file", file)
+          formData.append("category", "other")
+          await fetch(`/api/projects/${newProject.id}/files`, {
+            method: "POST",
+            body: formData,
+          })
+        } catch (fileErr) {
+          console.error("Failed to upload file:", file.name, fileErr)
+        }
+      }
+    }
+
+    // Revalidate to get fresh data from server (includes uploaded files)
+    await mutate()
 
     return newProject
   }, [mutate])
 
   const updateProject = useCallback(async (id: string, updates: UpdateProjectInput): Promise<void> => {
-    // Optimistically update
-    await mutate(
-      (current) => {
-        if (!current) return current
-        return current.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                name: updates.name ?? p.name,
-                description: updates.description ?? p.description,
-                company_address: updates.companyAddress ?? p.company_address,
-                tags: updates.tags ?? p.tags,
-                updated_at: new Date().toISOString(),
-              }
-            : p
-        )
-      },
-      { revalidate: false }
-    )
-
-    // Actually update on server
+    // Update on server first
     await putApi(`/projects/${id}`, {
       name: updates.name,
       description: updates.description,
@@ -115,21 +114,38 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
       tags: updates.tags,
     })
 
-    // Revalidate to ensure consistency
+    // Revalidate to get fresh data from server
     await mutate()
   }, [mutate])
 
   const deleteProject = useCallback(async (id: string): Promise<void> => {
-    // Optimistically remove from UI immediately
-    await mutate(
-      (current) => current?.filter((p) => p.id !== id),
-      { revalidate: false }
-    )
-
-    // Actually delete on server
+    // Delete on server first
     await deleteApi(`/projects/${id}`)
-    
-    // Force revalidate to ensure cache is in sync with server
+
+    // Revalidate to get fresh data from server
+    await mutate()
+  }, [mutate])
+
+  const addFiles = useCallback(async (projectId: string, files: File[], category: string): Promise<void> => {
+    for (const file of files) {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("category", category)
+      const response = await fetch(`/api/projects/${projectId}/files`, {
+        method: "POST",
+        body: formData,
+      })
+      if (!response.ok) throw new Error("Upload failed")
+    }
+
+    // Revalidate to get fresh data from server
+    await mutate()
+  }, [mutate])
+
+  const removeFile = useCallback(async (projectId: string, fileId: string): Promise<void> => {
+    await deleteApi(`/projects/${projectId}/files/${fileId}`)
+
+    // Revalidate to get fresh data from server
     await mutate()
   }, [mutate])
 
@@ -142,6 +158,8 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
     createProject,
     updateProject,
     deleteProject,
+    addFiles,
+    removeFile,
   }
 }
 
@@ -155,6 +173,7 @@ export function useProject(projectId: string | null, options: { fallbackData?: P
     {
       fallbackData: options.fallbackData ? projectToResponse(options.fallbackData) : undefined,
       revalidateOnFocus: false,
+      revalidateOnReconnect: true,
     }
   )
 
@@ -169,27 +188,31 @@ export function useProject(projectId: string | null, options: { fallbackData?: P
     isLoading,
     error: error ?? null,
     refresh,
+    mutate,
   }
 }
 
 /**
- * Invalidate all project-related caches
+ * Invalidate all project-related caches - call this after any project mutation
  */
 export function invalidateProjects() {
   globalMutate((key) => typeof key === "string" && key.startsWith("/api/projects"))
 }
 
-// Helper to convert Project back to API response format (for optimistic updates)
+// Helper to convert Project back to API response format (for fallback data)
 function projectToResponse(project: Project): ProjectResponse {
   return {
     id: project.id,
-    user_id: "", // Not needed for display
+    user_id: "",
     name: project.name,
     description: project.description,
     company_address: project.companyAddress,
     tags: project.tags,
     is_owner: true,
     permission: "owner",
+    ai_project_id: project.aiProjectId,
+    indexing_status: project.indexingStatus,
+    indexing_error: project.indexingError,
     files: project.files.map((f) => ({
       id: f.id,
       project_id: project.id,
