@@ -48,6 +48,8 @@ export function ProjectOverview({
   const [isQuotePanelOpen, setIsQuotePanelOpen] = useState(false)
   const [quoteHistory, setQuoteHistory] = useState<QuoteRequest[]>([])
   const [quoteHistoryLoading, setQuoteHistoryLoading] = useState(false)
+  const [selectedQuote, setSelectedQuote] = useState<QuoteRequest | null>(null)
+  const [selectedQuoteLoading, setSelectedQuoteLoading] = useState(false)
   
   const nameInputRef = useRef<HTMLInputElement>(null)
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null)
@@ -163,6 +165,22 @@ export function ProjectOverview({
     }
     fetchQuoteHistory()
   }, [project.id])
+
+  // Fetch full quote details when clicked
+  const handleViewQuote = async (quoteId: string) => {
+    setSelectedQuoteLoading(true)
+    try {
+      const res = await fetch(`/api/quotes/${quoteId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedQuote(data.data || data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch quote details:', err)
+    } finally {
+      setSelectedQuoteLoading(false)
+    }
+  }
 
   const handleSaveName = () => {
     if (editName.trim()) {
@@ -701,9 +719,10 @@ export function ProjectOverview({
           ) : (
             <div className="space-y-2">
               {quoteHistory.map(quote => (
-                <div
+                <button
                   key={quote.id}
-                  className="p-4 bg-[#111827] border border-border rounded-lg hover:border-accent/30 transition-colors"
+                  onClick={() => handleViewQuote(quote.id)}
+                  className="w-full p-4 bg-[#111827] border border-border rounded-lg hover:border-accent/30 hover:bg-[#1e293b] transition-colors text-left"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -744,7 +763,7 @@ export function ProjectOverview({
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -910,6 +929,136 @@ export function ProjectOverview({
                   )}
                 </button>
               </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Quote Details Modal */}
+      <AnimatePresence>
+        {(selectedQuote || selectedQuoteLoading) && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+              onClick={() => !selectedQuoteLoading && setSelectedQuote(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#111827] border border-border rounded-2xl shadow-2xl z-[101]"
+            >
+              {selectedQuoteLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                  <span className="ml-3 text-muted-foreground">Loading quote details...</span>
+                </div>
+              ) : selectedQuote && (
+                <>
+                  {/* Header */}
+                  <div className="sticky top-0 bg-[#111827] border-b border-border p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+                        <Quote className="w-5 h-5 text-accent" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold text-foreground">
+                          {selectedQuote.segment_name || selectedQuote.segment}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedQuote.project_sqft?.toLocaleString()} sqft · {new Date(selectedQuote.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedQuote(null)}
+                      className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
+                    >
+                      <X className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-6">
+                    {/* IIVY Benchmark */}
+                    {selectedQuote.iivy_benchmark && (
+                      <div className="p-5 bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 rounded-xl">
+                        <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-accent" />
+                          IIVY Benchmark
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="text-center p-3 bg-surface/50 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1">Per sqft</p>
+                            <p className="text-lg font-semibold text-foreground">
+                              ${selectedQuote.iivy_benchmark.range_per_sf?.low?.toFixed(2)} - ${selectedQuote.iivy_benchmark.range_per_sf?.high?.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="text-center p-3 bg-surface/50 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1">Total Estimate</p>
+                            <p className="text-lg font-semibold text-accent">
+                              ${selectedQuote.iivy_benchmark.range_total?.low?.toLocaleString()} - ${selectedQuote.iivy_benchmark.range_total?.high?.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Vendor Quotes */}
+                    <div>
+                      <h3 className="font-semibold text-foreground mb-3">
+                        Vendor Quotes ({selectedQuote.vendor_quotes?.length || 0})
+                      </h3>
+                      {selectedQuote.vendor_quotes && selectedQuote.vendor_quotes.length > 0 ? (
+                        <div className="space-y-3">
+                          {selectedQuote.vendor_quotes.map((vq, index) => (
+                            <div key={index} className="p-4 border border-border rounded-xl bg-surface/50">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium text-foreground">{vq.company_name}</span>
+                                <span className="text-lg font-semibold text-accent">
+                                  ${vq.total?.toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <span>${vq.final_rate_per_sf?.toFixed(2)}/sf</span>
+                                {vq.lead_time && <span>Lead time: {vq.lead_time}</span>}
+                              </div>
+                              {vq.company_description && (
+                                <p className="text-sm text-muted-foreground mt-2 italic">
+                                  {vq.company_description}
+                                </p>
+                              )}
+                              <div className="mt-3 pt-3 border-t border-border/50">
+                                <a
+                                  href={`mailto:${vq.contact_email || vq.user_email}?subject=Quote Request - ${selectedQuote.segment_name || selectedQuote.segment}`}
+                                  className="inline-flex items-center gap-2 text-sm text-accent hover:text-accent/80 transition-colors"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                  {vq.contact_email || vq.user_email}
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 border border-dashed border-border rounded-xl">
+                          <p className="text-muted-foreground">No vendor quotes available for this request</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setSelectedQuote(null)}
+                      className="w-full px-4 py-3 bg-accent text-background font-medium rounded-xl hover:bg-accent/90 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </>
         )}
