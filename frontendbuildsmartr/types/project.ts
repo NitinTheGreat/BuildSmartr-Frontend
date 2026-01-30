@@ -83,6 +83,12 @@ export interface Project {
   aiProjectId?: string | null
   indexingStatus?: 'not_started' | 'indexing' | 'completed' | 'failed' | null
   indexingError?: string | null
+  // Structured address fields for quotes feature
+  addressStreet?: string
+  addressCity?: string
+  addressRegion?: string
+  addressCountry?: string
+  addressPostal?: string
 }
 
 // ============================================
@@ -167,4 +173,152 @@ export interface IndexingResponse {
     attachments_data: string
   }
   progress_log: IndexingProgressLog[]
+}
+
+
+// ============================================
+// Quote Feature Types
+// ============================================
+
+/** A single trade segment with benchmark pricing */
+export interface Segment {
+  id: string
+  name: string
+  phase?: string
+  phase_order?: number
+  benchmark_low: number
+  benchmark_high: number
+  benchmark_unit: string
+  notes?: string
+}
+
+/** Phase grouping for segments dropdown */
+export interface SegmentPhase {
+  name: string
+  order: number
+  segments: Segment[]
+}
+
+/** Segments grouped by phase */
+export interface SegmentsResponse {
+  phases: SegmentPhase[]
+}
+
+/** Vendor service offering for quotes */
+export interface VendorService {
+  id: string
+  company_name: string
+  segment: string
+  segment_name?: string
+  segment_phase?: string
+  benchmark_low?: number
+  benchmark_high?: number
+  countries_served: string[]
+  regions_served: string[]
+  pricing_rules?: string
+  lead_time?: string
+  notes?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Form data for creating/updating vendor service */
+export interface VendorServiceFormData {
+  company_name: string
+  segment: string
+  countries_served: string[]
+  regions_served: string[]
+  pricing_rules?: string
+  lead_time?: string
+  notes?: string
+}
+
+/** Adjustment to quote pricing */
+export interface QuoteAdjustment {
+  reason: string
+  delta_per_sf: number
+}
+
+/** Individual vendor quote */
+export interface VendorQuote {
+  company_name: string
+  user_email: string
+  base_rate_per_sf: number
+  adjustments: QuoteAdjustment[]
+  final_rate_per_sf: number
+  total: number
+  lead_time?: string
+  notes: string[]
+}
+
+/** IIVY benchmark calculation */
+export interface IIVYBenchmark {
+  segment_id: string
+  segment_name: string
+  benchmark_unit: string
+  range_per_sf: {
+    low: number
+    high: number
+  }
+  range_total: {
+    low: number
+    high: number
+  }
+  project_sqft: number
+  notes?: string
+}
+
+/** Project address for quotes */
+export interface ProjectAddress {
+  street?: string
+  city?: string
+  region?: string
+  country?: string
+  postal?: string
+}
+
+/** Full quote request with results */
+export interface QuoteRequest {
+  id: string
+  project_id: string
+  chat_id?: string
+  segment: string
+  segment_name?: string
+  segment_phase?: string
+  project_sqft: number
+  options?: Record<string, unknown>
+  address: ProjectAddress
+  status: 'matching_vendors' | 'generating_quotes' | 'completed' | 'failed'
+  matched_vendors?: { user_email: string; company_name: string }[]
+  matched_vendors_count?: number
+  vendor_quotes: VendorQuote[]
+  iivy_benchmark?: IIVYBenchmark
+  error_message?: string
+  created_at: string
+  completed_at?: string
+}
+
+/** Summary of quote for list views */
+export interface QuoteSummary {
+  id: string
+  segment: string
+  segment_name?: string
+  project_sqft: number
+  status: string
+  vendor_quotes_count: number
+  benchmark_range: {
+    low?: number
+    high?: number
+  }
+  created_at: string
+  completed_at?: string
+}
+
+/** Quote request form data */
+export interface QuoteRequestFormData {
+  segment: string
+  project_sqft: number
+  options?: Record<string, unknown>
+  chat_id?: string
 }

@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import ConnectEmailButtons from "@/components/ConnectEmailButtons";
 import CompanyInfoEditor from "@/components/CompanyInfoEditor";
+import VendorServicesSection from "@/components/VendorServicesSection";
 import { LogoutButton } from "@/components/LogoutButton";
 
 export default async function AccountPage() {
@@ -103,6 +104,11 @@ export default async function AccountPage() {
             Tell us about your company so we can better assist you with your projects.
           </p>
           <CompanyInfoEditor initialValue={userInfo?.user_company_info} />
+        </div>
+
+        {/* Vendor Services */}
+        <div className="mb-4 sm:mb-6">
+          <VendorServicesSection />
         </div>
 
         {/* Connect Email Accounts */}

@@ -27,7 +27,7 @@ interface ProjectContextType {
   loadProjects: () => Promise<void>
   loadProject: (projectId: string) => Promise<Project | null>
   createProject: (name: string, description: string, companyAddress: string, tags: string[], files: File[]) => Promise<Project>
-  updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'description' | 'companyAddress' | 'tags'>>) => Promise<void>
+  updateProject: (id: string, updates: Partial<Pick<Project, 'name' | 'description' | 'companyAddress' | 'tags' | 'addressStreet' | 'addressCity' | 'addressRegion' | 'addressCountry' | 'addressPostal'>>) => Promise<void>
   deleteProject: (id: string) => Promise<void>
   setCurrentProject: (project: Project | null) => void
 

@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
 import { Sparkles, Mic, FileEdit, FolderOpen, File, Plus, MessageSquare, Pencil, Check, X, Trash2, HardHat, Ruler, FileText, ArrowLeft, Globe, Mail, Quote, ChevronDown, Share2, Eye, Paperclip, MoreVertical, Ban, Loader2, Search, ExternalLink, Clock, User } from "lucide-react"
-import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile } from "@/types/project"
+import type { Project, ChatMessage, ProjectChat, SearchMode, ProjectFile, ProjectAddress } from "@/types/project"
 import type { SourceItem } from "@/types/streaming"
 import { EditFilesModal } from "./EditFilesModal"
 import { ShareProjectModal } from "./ShareProjectModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
+import { QuotePanel } from "./QuotePanel"
 import { useProjects } from "@/contexts/ProjectContext"
 import { useStreamingSearch } from "@/hooks/useStreamingSearch"
 import { useRouter } from "next/navigation"
@@ -49,6 +50,7 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isQuotePanelOpen, setIsQuotePanelOpen] = useState(false)
   // Optimistic message - shown immediately when user sends
   const [optimisticMessage, setOptimisticMessage] = useState<{ content: string; searchModes?: SearchMode[] } | null>(null)
   // Message queue - messages waiting to be processed
@@ -159,6 +161,12 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   }, [])
 
   const handleModeToggle = (mode: SearchMode) => {
+    // Special handling for quotes mode - open the quote panel
+    if (mode === 'quotes') {
+      setIsQuotePanelOpen(true)
+      return
+    }
+
     const option = searchModeOptions.find(o => o.id === mode)
 
     if (option?.exclusive) {
@@ -176,6 +184,15 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         setSelectedModes(prev => [...prev, mode])
       }
     }
+  }
+
+  // Build project address from project data
+  const projectAddress: ProjectAddress = {
+    street: (project as any).address_street,
+    city: (project as any).address_city,
+    region: (project as any).address_region,
+    country: (project as any).address_country || 'CA',
+    postal: (project as any).address_postal,
   }
 
   const removeMode = (mode: SearchMode) => {
@@ -449,6 +466,14 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           isOpen={!!previewFile}
           onClose={() => setPreviewFile(null)}
           file={previewFile}
+        />
+        <QuotePanel
+          isOpen={isQuotePanelOpen}
+          onClose={() => setIsQuotePanelOpen(false)}
+          projectId={project.id}
+          projectName={project.name}
+          projectAddress={projectAddress}
+          chatId={currentChatId || undefined}
         />
 
         <div className="min-h-screen flex flex-col bg-background">
@@ -803,7 +828,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
               <div className="max-w-4xl mx-auto px-6">
                 <form onSubmit={handleSubmit} className="relative">
                   <div className="relative bg-surface/80 backdrop-blur-xl rounded-2xl border border-border/60 shadow-2xl shadow-black/20 hover:border-border focus-within:border-accent/40 focus-within:ring-1 focus-within:ring-accent/20 transition-all duration-300">
-                    <div className="flex items-end gap-3 p-4">
+                    {/* Textarea and Send */}
+                    <div className="flex items-end gap-3 p-4 pb-2">
                       <textarea
                         ref={textareaRef}
                         value={query}
@@ -835,6 +861,57 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                           </svg>
                         )}
                       </motion.button>
+                    </div>
+
+                    {/* Action Chips - Bottom of Input */}
+                    <div className="flex items-center justify-between px-4 pb-3 pt-1 border-t border-border/20">
+                      <div className="flex items-center gap-2">
+                        {/* Search Active Indicator */}
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs font-medium">
+                          <Mail className="w-3 h-3" />
+                          Email
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1">
+                        {/* Web Search */}
+                        <button
+                          type="button"
+                          onClick={() => handleModeToggle('web')}
+                          className={`p-2 rounded-lg transition-colors ${
+                            selectedModes.includes('web')
+                              ? 'bg-accent/20 text-accent'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                          }`}
+                          title="Web Search"
+                        >
+                          <Globe className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Quotes Button */}
+                        <button
+                          type="button"
+                          onClick={() => setIsQuotePanelOpen(true)}
+                          className="p-2 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                          title="Get Quotes"
+                        >
+                          <Quote className="w-4 h-4" />
+                        </button>
+                        
+                        {/* PDF Search */}
+                        <button
+                          type="button"
+                          onClick={() => handleModeToggle('pdf')}
+                          className={`p-2 rounded-lg transition-colors ${
+                            selectedModes.includes('pdf')
+                              ? 'bg-accent/20 text-accent'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                          }`}
+                          title="PDF Search"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -870,6 +947,14 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         isOpen={!!previewFile}
         onClose={() => setPreviewFile(null)}
         file={previewFile}
+      />
+      <QuotePanel
+        isOpen={isQuotePanelOpen}
+        onClose={() => setIsQuotePanelOpen(false)}
+        projectId={project.id}
+        projectName={project.name}
+        projectAddress={projectAddress}
+        chatId={currentChatId || undefined}
       />
 
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
@@ -1057,6 +1142,30 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           )}
         </div>
 
+        {/* Get Quotes Section */}
+        <div className="w-full max-w-2xl mb-8">
+          <div className="p-6 bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+                  <Quote className="w-5 h-5 text-accent" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Get Vendor Quotes</h3>
+                  <p className="text-sm text-muted-foreground">Compare prices from vendors in your area</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => setIsQuotePanelOpen(true)}
+                className="bg-accent hover:bg-accent/90 text-background gap-2"
+              >
+                <Quote className="w-4 h-4" />
+                Get Quotes
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Chats Section */}
         <div className="w-full max-w-2xl mb-8">
           <div className="flex items-center justify-between mb-3">
@@ -1107,7 +1216,8 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         <div className="w-full max-w-2xl">
           <form onSubmit={handleSubmit} className="relative">
             <div className="relative bg-surface rounded-xl border border-border shadow-sm hover:border-muted transition-colors overflow-visible">
-              <div className="flex items-start gap-3 p-4">
+              {/* Textarea and Send Button */}
+              <div className="flex items-start gap-3 p-4 pb-2">
                 <textarea
                   ref={textareaRef}
                   value={query}
@@ -1124,10 +1234,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                 />
 
                 <div className="flex items-center gap-2 pt-2">
-                  {/*
-                  // Mic and other icons commented out for now
-                  <motion.button ... > <Mic className="size-5" /> </motion.button>
-                  */}
                   <Button
                     type="submit"
                     size="icon"
@@ -1139,6 +1245,60 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 20l16-8-16-8v6l12 2-12 2v6z" />
                     </svg>
                   </Button>
+                </div>
+              </div>
+
+              {/* Action Chips - Perplexity Style */}
+              <div className="flex items-center justify-between px-4 pb-3 pt-1 border-t border-border/30">
+                <div className="flex items-center gap-2">
+                  {/* Search Mode Chip */}
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    Search
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {/* Web Search Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleModeToggle('web')}
+                    className={`p-2 rounded-lg transition-colors ${
+                      selectedModes.includes('web')
+                        ? 'bg-accent/20 text-accent'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    }`}
+                    title="Web Search"
+                  >
+                    <Globe className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Quotes Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsQuotePanelOpen(true)}
+                    className="p-2 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                    title="Get Quotes"
+                  >
+                    <Quote className="w-4 h-4" />
+                  </button>
+                  
+                  {/* PDF Search Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleModeToggle('pdf')}
+                    className={`p-2 rounded-lg transition-colors ${
+                      selectedModes.includes('pdf')
+                        ? 'bg-accent/20 text-accent'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    }`}
+                    title="PDF Search"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>

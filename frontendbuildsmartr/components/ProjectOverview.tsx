@@ -5,11 +5,24 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { 
   FolderOpen, Plus, MessageSquare, Pencil, Check, X, Trash2, 
-  HardHat, Ruler, FileText, Eye, MoreVertical, Loader2, FileEdit
+  HardHat, Ruler, FileText, Eye, MoreVertical, Loader2, FileEdit, 
+  Quote, Globe, Search, Mail
 } from "lucide-react"
-import type { Project, ProjectFile } from "@/types/project"
+import type { Project, ProjectFile, ProjectAddress, SearchMode } from "@/types/project"
 import { EditFilesModal } from "./EditFilesModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
+import { QuotePanel } from "./QuotePanel"
+
+interface SearchModeOption {
+  id: SearchMode
+  label: string
+  icon: React.ElementType
+}
+
+const searchModeOptions: SearchModeOption[] = [
+  { id: 'web', label: 'Web', icon: Globe },
+  { id: 'quotes', label: 'Quotes', icon: Quote },
+]
 import { useProjects } from "@/contexts/ProjectContext"
 import { useSendMessage } from "@/hooks/useSendMessage"
 import { useChatMessages } from "@/hooks/useChatMessages"
@@ -42,6 +55,11 @@ export function ProjectOverview({
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [inputValue, setInputValue] = useState("")
+  const [isQuotePanelOpen, setIsQuotePanelOpen] = useState(false)
+  const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
+  
+  // Check if quotes mode is active
+  const isQuoteModeActive = selectedModes.includes('quotes')
   
   const nameInputRef = useRef<HTMLInputElement>(null)
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null)
@@ -50,6 +68,25 @@ export function ProjectOverview({
   const router = useRouter()
 
   const { updateProject, deleteProject, createChat, setCurrentChatId } = useProjects()
+
+  // Build project address from project data
+  const projectAddress: ProjectAddress = {
+    street: project.addressStreet,
+    city: project.addressCity,
+    region: project.addressRegion,
+    country: project.addressCountry || 'CA',
+    postal: project.addressPostal,
+  }
+  
+  // Address editing state
+  const [isEditingAddress, setIsEditingAddress] = useState(false)
+  const [editAddress, setEditAddress] = useState<ProjectAddress>({
+    street: project.addressStreet || '',
+    city: project.addressCity || '',
+    region: project.addressRegion || '',
+    country: project.addressCountry || 'CA',
+    postal: project.addressPostal || '',
+  })
 
   // Use the new send message hook for sending from overview
   // When we send a message here, it will create a chat and we'll switch to ChatView
@@ -100,7 +137,14 @@ export function ProjectOverview({
   useEffect(() => {
     setEditName(project.name)
     setEditDescription(project.description)
-  }, [project.name, project.description])
+    setEditAddress({
+      street: project.addressStreet || '',
+      city: project.addressCity || '',
+      region: project.addressRegion || '',
+      country: project.addressCountry || 'CA',
+      postal: project.addressPostal || '',
+    })
+  }, [project.name, project.description, project.addressStreet, project.addressCity, project.addressRegion, project.addressCountry, project.addressPostal])
 
   // Close settings dropdown when clicking outside
   useEffect(() => {
@@ -135,6 +179,29 @@ export function ProjectOverview({
   const handleCancelEditDescription = () => {
     setEditDescription(project.description)
     setIsEditingDescription(false)
+  }
+
+  const handleSaveAddress = async () => {
+    await updateProject(project.id, {
+      addressStreet: editAddress.street || undefined,
+      addressCity: editAddress.city || undefined,
+      addressRegion: editAddress.region || undefined,
+      addressCountry: editAddress.country || undefined,
+      addressPostal: editAddress.postal || undefined,
+    })
+    await refreshProjects()
+    setIsEditingAddress(false)
+  }
+
+  const handleCancelEditAddress = () => {
+    setEditAddress({
+      street: project.addressStreet || '',
+      city: project.addressCity || '',
+      region: project.addressRegion || '',
+      country: project.addressCountry || 'CA',
+      postal: project.addressPostal || '',
+    })
+    setIsEditingAddress(false)
   }
 
   const handleDeleteProject = async () => {
@@ -173,6 +240,21 @@ export function ProjectOverview({
     setInputValue("")
     send(content)
   }, [inputValue, isSending, send])
+
+  const handleModeToggle = (mode: SearchMode) => {
+    // Special handling for quotes mode - open the quote panel
+    if (mode === 'quotes') {
+      setIsQuotePanelOpen(true)
+      return
+    }
+    
+    // Toggle other modes
+    if (selectedModes.includes(mode)) {
+      setSelectedModes(prev => prev.filter(m => m !== mode))
+    } else {
+      setSelectedModes(prev => [...prev, mode])
+    }
+  }
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -223,6 +305,13 @@ export function ProjectOverview({
         isOpen={!!previewFile}
         onClose={() => setPreviewFile(null)}
         file={previewFile}
+      />
+      <QuotePanel
+        isOpen={isQuotePanelOpen}
+        onClose={() => setIsQuotePanelOpen(false)}
+        projectId={project.id}
+        projectName={project.name}
+        projectAddress={projectAddress}
       />
 
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
@@ -334,6 +423,149 @@ export function ProjectOverview({
           )}
         </div>
 
+        {/* Project Address Section - Required for Quotes */}
+        <div className="w-full max-w-2xl mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-foreground flex items-center gap-2">
+              Project Location
+              {(!project.addressRegion || !project.addressCountry) && (
+                <span className="text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                  Required for Quotes
+                </span>
+              )}
+            </span>
+            {!isEditingAddress && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditingAddress(true)}
+                className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit Location
+              </Button>
+            )}
+          </div>
+
+          <AnimatePresence mode="wait">
+            {isEditingAddress ? (
+              <motion.div
+                key="editing"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-[#111827] border border-border rounded-lg p-4 space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Street Address</label>
+                    <input
+                      type="text"
+                      value={editAddress.street || ''}
+                      onChange={(e) => setEditAddress(prev => ({ ...prev, street: e.target.value }))}
+                      placeholder="123 Main Street"
+                      className="w-full bg-[#1f2121] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">City</label>
+                    <input
+                      type="text"
+                      value={editAddress.city || ''}
+                      onChange={(e) => setEditAddress(prev => ({ ...prev, city: e.target.value }))}
+                      placeholder="Toronto"
+                      className="w-full bg-[#1f2121] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">
+                      Region/Province <span className="text-amber-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editAddress.region || ''}
+                      onChange={(e) => setEditAddress(prev => ({ ...prev, region: e.target.value }))}
+                      placeholder="Ontario"
+                      className="w-full bg-[#1f2121] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">
+                      Country <span className="text-amber-400">*</span>
+                    </label>
+                    <select
+                      value={editAddress.country || 'CA'}
+                      onChange={(e) => setEditAddress(prev => ({ ...prev, country: e.target.value }))}
+                      className="w-full bg-[#1f2121] border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      <option value="CA">Canada</option>
+                      <option value="US">United States</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Postal Code</label>
+                    <input
+                      type="text"
+                      value={editAddress.postal || ''}
+                      onChange={(e) => setEditAddress(prev => ({ ...prev, postal: e.target.value }))}
+                      placeholder="M5V 3L9"
+                      className="w-full bg-[#1f2121] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={handleCancelEditAddress}
+                    className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-[#1e293b] rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveAddress}
+                    disabled={!editAddress.region || !editAddress.country}
+                    className="px-4 py-2 text-sm text-background bg-accent hover:bg-accent-strong rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Save Location
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="display"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-[#111827] border border-border rounded-lg p-4"
+              >
+                {project.addressRegion || project.addressCity ? (
+                  <div className="flex items-center gap-2 text-sm text-foreground">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>
+                      {[
+                        project.addressStreet,
+                        project.addressCity,
+                        project.addressRegion,
+                        project.addressCountry === 'CA' ? 'Canada' : project.addressCountry === 'US' ? 'United States' : project.addressCountry,
+                        project.addressPostal,
+                      ].filter(Boolean).join(', ')}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-center py-2">
+                    <p className="text-sm text-muted-foreground/50 italic">
+                      No location set - click Edit Location to add one
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Files Section */}
         <div className="w-full max-w-2xl mb-8">
           <div className="flex items-center justify-between mb-3">
@@ -430,11 +662,11 @@ export function ProjectOverview({
           )}
         </div>
 
-        {/* Chat Input */}
+        {/* Chat Input with Search Mode Options */}
         <div className="w-full max-w-2xl">
           <form onSubmit={handleSubmit} className="relative">
             <div className="relative bg-surface rounded-xl border border-border shadow-sm hover:border-muted transition-colors overflow-visible">
-              <div className="flex items-start gap-3 p-4">
+              <div className="flex items-start gap-3 p-4 pb-2">
                 <textarea
                   ref={textareaRef}
                   value={inputValue}
@@ -460,7 +692,48 @@ export function ProjectOverview({
                   </svg>
                 </Button>
               </div>
+              
+              {/* Search Mode Options */}
+              <div className="flex items-center justify-between px-4 pb-3 pt-1 border-t border-border/30">
+                <div className="flex items-center gap-2">
+                  {/* Search Active Indicator */}
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs font-medium">
+                    <Search className="w-3 h-3" />
+                    Search
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-1">
+                  {/* Web Search Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleModeToggle('web')}
+                    className={`p-2 rounded-lg transition-colors ${
+                      selectedModes.includes('web')
+                        ? 'bg-accent/20 text-accent'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                    }`}
+                    title="Web Search"
+                  >
+                    <Globe className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Quotes Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsQuotePanelOpen(true)}
+                    className="p-2 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                    title="Get Quotes"
+                  >
+                    <Quote className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
+            
+            <p className="text-[11px] text-muted-foreground/40 text-center mt-3 tracking-wide">
+              Enter to send · Shift+Enter for new line
+            </p>
           </form>
         </div>
       </div>

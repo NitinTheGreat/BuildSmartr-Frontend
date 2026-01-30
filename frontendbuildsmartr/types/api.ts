@@ -19,6 +19,12 @@ export interface ProjectResponse {
   ai_project_id?: string | null
   indexing_status?: "not_started" | "indexing" | "completed" | "failed" | null
   indexing_error?: string | null
+  // Structured address fields for quotes feature
+  address_street?: string | null
+  address_city?: string | null
+  address_region?: string | null
+  address_country?: string | null
+  address_postal?: string | null
 }
 
 export interface ProjectFileResponse {

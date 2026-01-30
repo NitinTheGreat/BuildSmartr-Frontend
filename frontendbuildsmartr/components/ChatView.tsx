@@ -4,13 +4,15 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Sparkles, ArrowLeft, FileText, ChevronDown, 
-  Loader2, Search, Clock, User, Copy, X, AlertTriangle
+  Loader2, Search, Clock, User, Copy, X, AlertTriangle,
+  Globe, Quote, Mail
 } from "lucide-react"
-import type { Project, ChatMessage, MessageSource } from "@/types/project"
+import type { Project, ChatMessage, MessageSource, SearchMode, ProjectAddress } from "@/types/project"
 import type { SourceItem } from "@/types/streaming"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
 import { useChatMessages } from "@/hooks/useChatMessages"
 import { useSendMessage } from "@/hooks/useSendMessage"
+import { QuotePanel } from "./QuotePanel"
 
 // ============================================
 // Sub-components
@@ -239,8 +241,32 @@ export function ChatView({
 }: ChatViewProps) {
   // Input state
   const [inputValue, setInputValue] = useState("")
+  const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
+  const [isQuotePanelOpen, setIsQuotePanelOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Build project address from project data
+  const projectAddress: ProjectAddress = {
+    street: project.addressStreet,
+    city: project.addressCity,
+    region: project.addressRegion,
+    country: project.addressCountry || 'CA',
+    postal: project.addressPostal,
+  }
+
+  const handleModeToggle = (mode: SearchMode) => {
+    if (mode === 'quotes') {
+      setIsQuotePanelOpen(true)
+      return
+    }
+    
+    if (selectedModes.includes(mode)) {
+      setSelectedModes(prev => prev.filter(m => m !== mode))
+    } else {
+      setSelectedModes(prev => [...prev, mode])
+    }
+  }
 
   // Fetch messages for this chat
   const {
@@ -249,6 +275,57 @@ export function ChatView({
     error: messagesError,
     addMessage,
   } = useChatMessages(chatId)
+
+  // Handler to add quote results as a chat message (Q&A style)
+  const handleAddQuoteMessage = useCallback(async (question: string, answer: string) => {
+    if (!chatId) return
+    
+    try {
+      // First, add a user message with the quote request details
+      const userResponse = await fetch(`/api/chats/${chatId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'user',
+          content: question,
+          search_modes: ['quotes'],
+        }),
+      })
+      
+      if (userResponse.ok) {
+        const savedUserMessage = await userResponse.json()
+        addMessage({
+          id: savedUserMessage.id,
+          role: 'user',
+          content: question,
+          timestamp: new Date(savedUserMessage.timestamp),
+          searchModes: ['quotes'],
+        })
+      }
+      
+      // Then add the assistant response with the quote results
+      const response = await fetch(`/api/chats/${chatId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'assistant',
+          content: answer,
+        }),
+      })
+      
+      if (response.ok) {
+        const savedMessage = await response.json()
+        addMessage({
+          id: savedMessage.id,
+          role: 'assistant',
+          content: answer,
+          timestamp: new Date(savedMessage.timestamp),
+        })
+      }
+    } catch (err) {
+      console.error('Failed to save quote message:', err)
+    }
+  }, [chatId, addMessage])
 
   // Send message flow
   const {
@@ -526,7 +603,7 @@ export function ChatView({
           <div className="max-w-4xl mx-auto px-6">
             <form onSubmit={handleSubmit} className="relative">
               <div className="relative bg-surface/80 backdrop-blur-xl rounded-2xl border border-border/60 shadow-2xl shadow-black/20 hover:border-border focus-within:border-accent/40 focus-within:ring-1 focus-within:ring-accent/20 transition-all duration-300">
-                <div className="flex items-end gap-3 p-4">
+                <div className="flex items-end gap-3 p-4 pb-2">
                   <textarea
                     ref={textareaRef}
                     value={inputValue}
@@ -560,6 +637,57 @@ export function ChatView({
                     )}
                   </motion.button>
                 </div>
+                
+                {/* Search Mode Options */}
+                <div className="flex items-center justify-between px-4 pb-3 pt-1 border-t border-border/30">
+                  <div className="flex items-center gap-2">
+                    {/* Search Active Indicator */}
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs font-medium">
+                      <Mail className="w-3 h-3" />
+                      Email
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    {/* Web Search Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => handleModeToggle('web')}
+                      className={`p-2 rounded-lg transition-colors ${
+                        selectedModes.includes('web')
+                          ? 'bg-accent/20 text-accent'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                      }`}
+                      title="Web Search"
+                    >
+                      <Globe className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Quotes Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsQuotePanelOpen(true)}
+                      className="p-2 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                      title="Get Quotes"
+                    >
+                      <Quote className="w-4 h-4" />
+                    </button>
+                    
+                    {/* PDF Search Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => handleModeToggle('pdf')}
+                      className={`p-2 rounded-lg transition-colors ${
+                        selectedModes.includes('pdf')
+                          ? 'bg-accent/20 text-accent'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                      }`}
+                      title="PDF Search"
+                    >
+                      <FileText className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <p className="text-[11px] text-muted-foreground/40 text-center mt-3 tracking-wide">
@@ -569,6 +697,17 @@ export function ChatView({
           </div>
         </div>
       </div>
+      
+      {/* Quote Panel Modal */}
+      <QuotePanel
+        isOpen={isQuotePanelOpen}
+        onClose={() => setIsQuotePanelOpen(false)}
+        projectId={project.id}
+        projectName={project.name}
+        projectAddress={projectAddress}
+        chatId={chatId || undefined}
+        onAddQuoteMessage={chatId ? handleAddQuoteMessage : undefined}
+      />
     </div>
   )
 }

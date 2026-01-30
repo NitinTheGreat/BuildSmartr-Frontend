@@ -45,6 +45,12 @@ interface UpdateProjectInput {
   description?: string
   companyAddress?: string
   tags?: string[]
+  // Structured address fields for quotes feature
+  addressStreet?: string
+  addressCity?: string
+  addressRegion?: string
+  addressCountry?: string
+  addressPostal?: string
 }
 
 /**
@@ -112,6 +118,12 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsReturn
       description: updates.description,
       company_address: updates.companyAddress,
       tags: updates.tags,
+      // Structured address fields for quotes feature
+      address_street: updates.addressStreet,
+      address_city: updates.addressCity,
+      address_region: updates.addressRegion,
+      address_country: updates.addressCountry,
+      address_postal: updates.addressPostal,
     })
 
     // Revalidate to get fresh data from server
@@ -213,6 +225,12 @@ function projectToResponse(project: Project): ProjectResponse {
     ai_project_id: project.aiProjectId,
     indexing_status: project.indexingStatus,
     indexing_error: project.indexingError,
+    // Structured address fields for quotes feature
+    address_street: project.addressStreet || null,
+    address_city: project.addressCity || null,
+    address_region: project.addressRegion || null,
+    address_country: project.addressCountry || null,
+    address_postal: project.addressPostal || null,
     files: project.files.map((f) => ({
       id: f.id,
       project_id: project.id,

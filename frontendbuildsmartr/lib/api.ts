@@ -30,6 +30,12 @@ export function toProject(res: ProjectResponse): Project {
     aiProjectId: res.ai_project_id || null,
     indexingStatus: res.indexing_status || null,
     indexingError: res.indexing_error || null,
+    // Structured address fields for quotes feature
+    addressStreet: res.address_street || undefined,
+    addressCity: res.address_city || undefined,
+    addressRegion: res.address_region || undefined,
+    addressCountry: res.address_country || undefined,
+    addressPostal: res.address_postal || undefined,
   }
 }
 
