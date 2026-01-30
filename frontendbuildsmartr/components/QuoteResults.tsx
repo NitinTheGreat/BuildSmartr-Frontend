@@ -244,8 +244,20 @@ export function QuoteResults({ quote, onClose, onNewQuote }: QuoteResultsProps) 
                             </div>
                           </div>
 
+                          {/* Company Description */}
+                          {vendor.company_description && (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                About Company
+                              </p>
+                              <p className="text-sm text-foreground/80">
+                                {vendor.company_description}
+                              </p>
+                            </div>
+                          )}
+
                           {/* Notes */}
-                          {vendor.notes.length > 0 && (
+                          {vendor.notes && vendor.notes.length > 0 && (
                             <div className="space-y-2">
                               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                 Notes
@@ -261,15 +273,25 @@ export function QuoteResults({ quote, onClose, onNewQuote }: QuoteResultsProps) 
                             </div>
                           )}
 
-                          {/* Contact */}
-                          <div className="pt-3 border-t border-border/50">
-                            <a
-                              href={`mailto:${vendor.user_email}?subject=Quote Request - ${quote.segment_name}`}
-                              className="inline-flex items-center gap-2 text-sm text-accent hover:text-accent/80 transition-colors"
-                            >
-                              <Mail className="w-4 h-4" />
+                          {/* Contact Section */}
+                          <div className="pt-3 border-t border-border/50 space-y-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Contact Vendor
-                            </a>
+                            </p>
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <p className="text-sm text-foreground font-medium">
+                                  {vendor.contact_email || vendor.user_email}
+                                </p>
+                              </div>
+                              <a
+                                href={`mailto:${vendor.contact_email || vendor.user_email}?subject=Quote Request - ${quote.segment_name}&body=Hi,%0A%0AI received your quote through IIVY for ${quote.segment_name} services.%0A%0AProject Details:%0A- Size: ${quote.project_sqft.toLocaleString()} sqft%0A- Your Quote: ${formatCurrency(vendor.total)}%0A%0AI would like to discuss this further.%0A%0ABest regards`}
+                                className="px-4 py-2 bg-accent text-background text-sm font-medium rounded-lg hover:bg-accent/90 transition-colors flex items-center gap-2"
+                              >
+                                <Mail className="w-4 h-4" />
+                                Email
+                              </a>
+                            </div>
                           </div>
                         </motion.div>
                       )}

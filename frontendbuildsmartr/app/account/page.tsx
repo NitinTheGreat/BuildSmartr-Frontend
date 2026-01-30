@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import ConnectEmailButtons from "@/components/ConnectEmailButtons";
 import CompanyInfoEditor from "@/components/CompanyInfoEditor";
 import VendorServicesSection from "@/components/VendorServicesSection";
+import VendorLeadsSection from "@/components/VendorLeadsSection";
 import { LogoutButton } from "@/components/LogoutButton";
 
 export default async function AccountPage() {
@@ -109,6 +110,11 @@ export default async function AccountPage() {
         {/* Vendor Services */}
         <div className="mb-4 sm:mb-6">
           <VendorServicesSection />
+        </div>
+
+        {/* Vendor Leads */}
+        <div className="mb-4 sm:mb-6">
+          <VendorLeadsSection />
         </div>
 
         {/* Connect Email Accounts */}

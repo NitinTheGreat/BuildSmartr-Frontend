@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button"
 import { 
   FolderOpen, Plus, MessageSquare, Pencil, Check, X, Trash2, 
   HardHat, Ruler, FileText, Eye, MoreVertical, Loader2, FileEdit, 
-  Quote, Search, Mail
+  Quote, Search, Mail, DollarSign, Clock, ChevronRight
 } from "lucide-react"
-import type { Project, ProjectFile, ProjectAddress } from "@/types/project"
+import type { Project, ProjectFile, ProjectAddress, QuoteRequest } from "@/types/project"
 import { EditFilesModal } from "./EditFilesModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
 import { QuotePanel } from "./QuotePanel"
@@ -46,6 +46,8 @@ export function ProjectOverview({
   const [isDeleting, setIsDeleting] = useState(false)
   const [inputValue, setInputValue] = useState("")
   const [isQuotePanelOpen, setIsQuotePanelOpen] = useState(false)
+  const [quoteHistory, setQuoteHistory] = useState<QuoteRequest[]>([])
+  const [quoteHistoryLoading, setQuoteHistoryLoading] = useState(false)
   
   const nameInputRef = useRef<HTMLInputElement>(null)
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null)
@@ -142,6 +144,25 @@ export function ProjectOverview({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Fetch quote history for this project
+  useEffect(() => {
+    async function fetchQuoteHistory() {
+      setQuoteHistoryLoading(true)
+      try {
+        const res = await fetch(`/api/projects/${project.id}/quotes`)
+        if (res.ok) {
+          const data = await res.json()
+          setQuoteHistory(Array.isArray(data) ? data : (data.data || []))
+        }
+      } catch (err) {
+        console.error('Failed to fetch quote history:', err)
+      } finally {
+        setQuoteHistoryLoading(false)
+      }
+    }
+    fetchQuoteHistory()
+  }, [project.id])
 
   const handleSaveName = () => {
     if (editName.trim()) {
@@ -635,6 +656,96 @@ export function ProjectOverview({
               >
                 Add files
               </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Quote History Section */}
+        <div className="w-full max-w-2xl mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Quote className="w-4 h-4 text-accent" />
+              Quote History ({quoteHistory.length})
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsQuotePanelOpen(true)}
+              className="bg-transparent border-border hover:bg-[#1e293b] gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New Quote
+            </Button>
+          </div>
+
+          {quoteHistoryLoading ? (
+            <div className="flex items-center justify-center py-8 bg-[#111827] border border-border rounded-lg">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading quotes...</span>
+            </div>
+          ) : quoteHistory.length === 0 ? (
+            <div className="text-center py-8 bg-[#111827] border border-dashed border-border rounded-lg">
+              <DollarSign className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-4">
+                No quotes requested yet for this project.
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsQuotePanelOpen(true)}
+                className="text-accent hover:text-accent-strong"
+              >
+                Request Your First Quote
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {quoteHistory.map(quote => (
+                <div
+                  key={quote.id}
+                  className="p-4 bg-[#111827] border border-border rounded-lg hover:border-accent/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-foreground">
+                          {quote.segment_name || quote.segment}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          quote.status === 'completed' 
+                            ? 'bg-green-500/20 text-green-400' 
+                            : quote.status === 'failed'
+                            ? 'bg-red-500/20 text-red-400'
+                            : 'bg-amber-500/20 text-amber-400'
+                        }`}>
+                          {quote.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Ruler className="w-3 h-3" />
+                          {quote.project_sqft?.toLocaleString()} sqft
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(quote.created_at).toLocaleDateString()}
+                        </span>
+                        {quote.vendor_quotes_count !== undefined && (
+                          <span className="text-accent">
+                            {quote.vendor_quotes_count} vendor{quote.vendor_quotes_count !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      {quote.benchmark_range?.low && quote.benchmark_range?.high && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          Benchmark: ${quote.benchmark_range.low.toLocaleString()} - ${quote.benchmark_range.high.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

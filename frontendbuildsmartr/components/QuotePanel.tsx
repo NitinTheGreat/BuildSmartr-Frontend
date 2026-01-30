@@ -63,6 +63,9 @@ function formatQuoteAsMarkdown(quote: QuoteRequest): string {
       lines.push(`- Rate: $${vq.final_rate_per_sf.toFixed(2)}/sqft`)
       lines.push(`- Total: $${vq.total.toLocaleString()}`)
       if (vq.lead_time) lines.push(`- Lead Time: ${vq.lead_time}`)
+      const contactEmail = vq.contact_email || vq.user_email
+      if (contactEmail) lines.push(`- 📧 Contact: [${contactEmail}](mailto:${contactEmail})`)
+      if (vq.company_description) lines.push(`- *${vq.company_description}*`)
       lines.push('')
     })
   } else {

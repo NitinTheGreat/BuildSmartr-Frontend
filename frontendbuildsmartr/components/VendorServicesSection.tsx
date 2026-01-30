@@ -97,6 +97,7 @@ export default function VendorServicesSection({ initialServices = [] }: VendorSe
     pricing_rules: "",
     lead_time: "",
     notes: "",
+    company_description: "",
   })
 
   // Fetch services and segments on mount
@@ -138,6 +139,7 @@ export default function VendorServicesSection({ initialServices = [] }: VendorSe
       pricing_rules: "",
       lead_time: "",
       notes: "",
+      company_description: "",
     })
     setEditingService(null)
     setError(null)
@@ -157,6 +159,7 @@ export default function VendorServicesSection({ initialServices = [] }: VendorSe
       pricing_rules: service.pricing_rules || "",
       lead_time: service.lead_time || "",
       notes: service.notes || "",
+      company_description: service.company_description || "",
     })
     setEditingService(service)
     setShowAddModal(true)
@@ -401,6 +404,23 @@ export default function VendorServicesSection({ initialServices = [] }: VendorSe
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                   placeholder="ABC Windows Ltd."
                 />
+              </div>
+
+              {/* Company Description */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Company Description
+                </label>
+                <textarea
+                  value={formData.company_description}
+                  onChange={e => setFormData(prev => ({ ...prev, company_description: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                  placeholder="Family-owned roofing company serving BC since 1985. Certified CertainTeed installer."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  This description will be shown to potential customers viewing your quotes.
+                </p>
               </div>
 
               {/* Segment */}

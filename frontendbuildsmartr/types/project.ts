@@ -208,6 +208,7 @@ export interface SegmentsResponse {
 export interface VendorService {
   id: string
   company_name: string
+  company_description?: string
   segment: string
   segment_name?: string
   segment_phase?: string
@@ -244,6 +245,9 @@ export interface QuoteAdjustment {
 export interface VendorQuote {
   company_name: string
   user_email: string
+  contact_email?: string
+  company_description?: string
+  vendor_service_id?: string
   base_rate_per_sf: number
   adjustments: QuoteAdjustment[]
   final_rate_per_sf: number
