@@ -749,9 +749,9 @@ export function ProjectOverview({
                           <Clock className="w-3 h-3" />
                           {new Date(quote.created_at).toLocaleDateString()}
                         </span>
-                        {quote.vendor_quotes_count !== undefined && (
+                        {quote.vendor_quotes?.length > 0 && (
                           <span className="text-accent">
-                            {quote.vendor_quotes_count} vendor{quote.vendor_quotes_count !== 1 ? 's' : ''}
+                            {quote.vendor_quotes.length} vendor{quote.vendor_quotes.length !== 1 ? 's' : ''}
                           </span>
                         )}
                       </div>
