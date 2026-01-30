@@ -58,30 +58,32 @@ export function useChatMessages(chatId: string | null): UseChatMessagesReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  // Request versioning to ignore stale fetch responses
-  const requestIdRef = useRef(0)
+  // Track the chatId we're currently fetching for (to detect stale responses)
+  const currentChatIdRef = useRef<string | null>(null)
 
   // Effect: fetch messages when chatId changes
   useEffect(() => {
     if (!chatId) {
       setMessages([])
       setError(null)
+      currentChatIdRef.current = null
       return
     }
     
-    // Increment request ID for this fetch
-    const myRequestId = ++requestIdRef.current
+    // Store the chatId we're fetching for
+    const fetchingForChatId = chatId
+    currentChatIdRef.current = chatId
     
     const fetchMessages = async () => {
       setIsLoading(true)
       setError(null)
       
       try {
-        const response = await fetch(`/api/chats/${chatId}/messages`)
+        const response = await fetch(`/api/chats/${fetchingForChatId}/messages`)
         
-        // Check if this is still the latest request
-        if (myRequestId !== requestIdRef.current) {
-          console.log('[useChatMessages] Ignoring stale response for chatId:', chatId)
+        // Only ignore if we're now fetching for a DIFFERENT chat
+        if (currentChatIdRef.current !== fetchingForChatId) {
+          console.log('[useChatMessages] Ignoring response for different chat:', fetchingForChatId, 'current:', currentChatIdRef.current)
           return
         }
         
@@ -92,23 +94,21 @@ export function useChatMessages(chatId: string | null): UseChatMessagesReturn {
         
         const data: MessageResponse[] = await response.json()
         
-        // Double-check we're still the latest request before updating state
-        if (myRequestId !== requestIdRef.current) {
-          console.log('[useChatMessages] Ignoring stale response (after parse) for chatId:', chatId)
+        // Only ignore if we're now fetching for a DIFFERENT chat
+        if (currentChatIdRef.current !== fetchingForChatId) {
+          console.log('[useChatMessages] Ignoring parsed response for different chat:', fetchingForChatId)
           return
         }
         
         setMessages(data.map(toMessage))
       } catch (err) {
-        // Only update error if this is still the latest request
-        if (myRequestId !== requestIdRef.current) return
+        if (currentChatIdRef.current !== fetchingForChatId) return
         
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch messages'
         setError(errorMessage)
         console.error('[useChatMessages] Fetch error:', errorMessage)
       } finally {
-        // Only update loading if this is still the latest request
-        if (myRequestId === requestIdRef.current) {
+        if (currentChatIdRef.current === fetchingForChatId) {
           setIsLoading(false)
         }
       }
@@ -133,16 +133,15 @@ export function useChatMessages(chatId: string | null): UseChatMessagesReturn {
   const refetch = useCallback(async () => {
     if (!chatId) return
     
-    // Increment request ID to invalidate any in-flight requests
-    const myRequestId = ++requestIdRef.current
+    const fetchingForChatId = chatId
     
     setIsLoading(true)
     setError(null)
     
     try {
-      const response = await fetch(`/api/chats/${chatId}/messages`)
+      const response = await fetch(`/api/chats/${fetchingForChatId}/messages`)
       
-      if (myRequestId !== requestIdRef.current) return
+      if (currentChatIdRef.current !== fetchingForChatId) return
       
       if (!response.ok) {
         const data = await response.json().catch(() => ({ error: 'Failed to fetch messages' }))
@@ -151,16 +150,16 @@ export function useChatMessages(chatId: string | null): UseChatMessagesReturn {
       
       const data: MessageResponse[] = await response.json()
       
-      if (myRequestId !== requestIdRef.current) return
+      if (currentChatIdRef.current !== fetchingForChatId) return
       
       setMessages(data.map(toMessage))
     } catch (err) {
-      if (myRequestId !== requestIdRef.current) return
+      if (currentChatIdRef.current !== fetchingForChatId) return
       
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch messages'
       setError(errorMessage)
     } finally {
-      if (myRequestId === requestIdRef.current) {
+      if (currentChatIdRef.current === fetchingForChatId) {
         setIsLoading(false)
       }
     }

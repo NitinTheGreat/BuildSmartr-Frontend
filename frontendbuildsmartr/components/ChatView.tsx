@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import { 
   Sparkles, ArrowLeft, FileText, ChevronDown, 
   Loader2, Search, Clock, User, Copy, X, AlertTriangle,
-  Globe, Quote, Mail
+  Quote, Mail
 } from "lucide-react"
-import type { Project, ChatMessage, MessageSource, SearchMode, ProjectAddress } from "@/types/project"
+import type { Project, ChatMessage, MessageSource, ProjectAddress } from "@/types/project"
 import type { SourceItem } from "@/types/streaming"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
 import { useChatMessages } from "@/hooks/useChatMessages"
@@ -649,20 +649,6 @@ export function ChatView({
                   </div>
                   
                   <div className="flex items-center gap-1">
-                    {/* Web Search Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => handleModeToggle('web')}
-                      className={`p-2 rounded-lg transition-colors ${
-                        selectedModes.includes('web')
-                          ? 'bg-accent/20 text-accent'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-                      }`}
-                      title="Web Search"
-                    >
-                      <Globe className="w-4 h-4" />
-                    </button>
-                    
                     {/* Quotes Button */}
                     <button
                       type="button"

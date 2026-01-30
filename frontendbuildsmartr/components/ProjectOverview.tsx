@@ -6,23 +6,13 @@ import { Button } from "@/components/ui/button"
 import { 
   FolderOpen, Plus, MessageSquare, Pencil, Check, X, Trash2, 
   HardHat, Ruler, FileText, Eye, MoreVertical, Loader2, FileEdit, 
-  Quote, Globe, Search, Mail
+  Quote, Search, Mail
 } from "lucide-react"
-import type { Project, ProjectFile, ProjectAddress, SearchMode } from "@/types/project"
+import type { Project, ProjectFile, ProjectAddress } from "@/types/project"
 import { EditFilesModal } from "./EditFilesModal"
 import { PDFPreviewModal } from "./PDFPreviewModal"
 import { QuotePanel } from "./QuotePanel"
 
-interface SearchModeOption {
-  id: SearchMode
-  label: string
-  icon: React.ElementType
-}
-
-const searchModeOptions: SearchModeOption[] = [
-  { id: 'web', label: 'Web', icon: Globe },
-  { id: 'quotes', label: 'Quotes', icon: Quote },
-]
 import { useProjects } from "@/contexts/ProjectContext"
 import { useSendMessage } from "@/hooks/useSendMessage"
 import { useChatMessages } from "@/hooks/useChatMessages"
@@ -56,10 +46,6 @@ export function ProjectOverview({
   const [isDeleting, setIsDeleting] = useState(false)
   const [inputValue, setInputValue] = useState("")
   const [isQuotePanelOpen, setIsQuotePanelOpen] = useState(false)
-  const [selectedModes, setSelectedModes] = useState<SearchMode[]>([])
-  
-  // Check if quotes mode is active
-  const isQuoteModeActive = selectedModes.includes('quotes')
   
   const nameInputRef = useRef<HTMLInputElement>(null)
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null)
@@ -222,6 +208,57 @@ export function ProjectOverview({
     onSelectChat(chat.id)
   }
 
+  // Handler to create a new chat and add quote results
+  const handleAddQuoteToNewChat = async (question: string, answer: string) => {
+    try {
+      // Create a new chat for the quote
+      const chat = await createChat(project.id)
+      
+      // Add the user message (quote request)
+      const userRes = await fetch(`/api/chats/${chat.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'user',
+          content: question,
+          search_modes: ['quotes'],
+        }),
+      })
+      
+      if (!userRes.ok) {
+        console.error('Failed to save user message:', await userRes.text())
+        return
+      }
+      
+      // Add the assistant message (quote results)
+      const assistantRes = await fetch(`/api/chats/${chat.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'assistant',
+          content: answer,
+        }),
+      })
+      
+      if (!assistantRes.ok) {
+        console.error('Failed to save assistant message:', await assistantRes.text())
+        return
+      }
+      
+      // Wait for DB to fully commit both messages
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Navigate to the chat FIRST, then refresh projects in background
+      // This prevents the refreshProjects from causing state changes during navigation
+      onSelectChat(chat.id)
+      
+      // Refresh projects in background (don't await)
+      refreshProjects().catch(console.error)
+    } catch (err) {
+      console.error('Failed to create quote chat:', err)
+    }
+  }
+
   const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
@@ -240,21 +277,6 @@ export function ProjectOverview({
     setInputValue("")
     send(content)
   }, [inputValue, isSending, send])
-
-  const handleModeToggle = (mode: SearchMode) => {
-    // Special handling for quotes mode - open the quote panel
-    if (mode === 'quotes') {
-      setIsQuotePanelOpen(true)
-      return
-    }
-    
-    // Toggle other modes
-    if (selectedModes.includes(mode)) {
-      setSelectedModes(prev => prev.filter(m => m !== mode))
-    } else {
-      setSelectedModes(prev => [...prev, mode])
-    }
-  }
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -312,6 +334,7 @@ export function ProjectOverview({
         projectId={project.id}
         projectName={project.name}
         projectAddress={projectAddress}
+        onAddQuoteMessage={handleAddQuoteToNewChat}
       />
 
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
@@ -704,20 +727,6 @@ export function ProjectOverview({
                 </div>
                 
                 <div className="flex items-center gap-1">
-                  {/* Web Search Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => handleModeToggle('web')}
-                    className={`p-2 rounded-lg transition-colors ${
-                      selectedModes.includes('web')
-                        ? 'bg-accent/20 text-accent'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-                    }`}
-                    title="Web Search"
-                  >
-                    <Globe className="w-4 h-4" />
-                  </button>
-                  
                   {/* Quotes Button */}
                   <button
                     type="button"

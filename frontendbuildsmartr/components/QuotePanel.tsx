@@ -15,26 +15,25 @@ interface QuotePanelProps {
   onClose: () => void
   onQuoteComplete?: (quote: QuoteRequest) => void
   /** Callback to add quote result as a chat message */
-  onAddQuoteMessage?: (question: string, answer: string) => void
+  onAddQuoteMessage?: (question: string, answer: string) => void | Promise<void>
 }
 
 /** Format the user question for a quote request */
 function formatQuoteQuestion(
   segmentName: string, 
   sqft: number, 
-  options: { finish: string; supply_install: boolean },
+  additionalRequirements?: string,
   address?: ProjectAddress
 ): string {
   const lines: string[] = []
   lines.push(`📊 Get a quote for **${segmentName}**`)
   lines.push('')
   lines.push(`- **Project Size:** ${sqft.toLocaleString()} sqft`)
-  lines.push(`- **Finish Level:** ${options.finish === 'premium' ? 'Premium' : 'Standard'}`)
-  if (options.supply_install) {
-    lines.push(`- **Includes:** Supply + Installation`)
-  }
   if (address?.city || address?.region) {
     lines.push(`- **Location:** ${[address.city, address.region, address.country].filter(Boolean).join(', ')}`)
+  }
+  if (additionalRequirements?.trim()) {
+    lines.push(`- **Requirements:** ${additionalRequirements.trim()}`)
   }
   return lines.join('\n')
 }
@@ -88,10 +87,7 @@ export function QuotePanel({
   const [segments, setSegments] = useState<SegmentsResponse | null>(null)
   const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null)
   const [projectSqft, setProjectSqft] = useState("")
-  const [options, setOptions] = useState({
-    finish: "standard" as "standard" | "premium",
-    supply_install: false,
-  })
+  const [additionalRequirements, setAdditionalRequirements] = useState("")
   const [loading, setLoading] = useState(false)
   const [loadingSegments, setLoadingSegments] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -129,7 +125,7 @@ export function QuotePanel({
         body: JSON.stringify({
           segment: selectedSegment.id,
           project_sqft: parseInt(projectSqft),
-          options: options,
+          additional_requirements: additionalRequirements.trim() || undefined,
           chat_id: chatId,
         }),
       })
@@ -157,11 +153,12 @@ export function QuotePanel({
         const question = formatQuoteQuestion(
           selectedSegment.name,
           parseInt(projectSqft),
-          options,
+          additionalRequirements,
           projectAddress
         )
         const answer = formatQuoteAsMarkdown(data)
-        onAddQuoteMessage(question, answer)
+        // Await the callback to ensure messages are saved before navigation
+        await onAddQuoteMessage(question, answer)
         onClose() // Close the panel since message is shown in chat
       } else {
         // No chat context - show results in the panel
@@ -177,7 +174,7 @@ export function QuotePanel({
   const resetForm = () => {
     setSelectedSegment(null)
     setProjectSqft("")
-    setOptions({ finish: "standard", supply_install: false })
+    setAdditionalRequirements("")
     setQuoteResult(null)
     setError(null)
   }
@@ -337,59 +334,24 @@ export function QuotePanel({
               )}
             </div>
 
-            {/* Options */}
-            <div className="space-y-4">
+            {/* Additional Requirements */}
+            <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 <span className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-muted-foreground" />
-                  Options
+                  Additional Requirements (optional)
                 </span>
               </label>
-
-              {/* Finish Toggle */}
-              <div className="flex items-center justify-between p-4 bg-muted/30 border border-border/50 rounded-xl">
-                <span className="text-sm text-foreground">Finish Level</span>
-                <div className="flex bg-background rounded-lg p-1">
-                  <button
-                    type="button"
-                    onClick={() => setOptions(prev => ({ ...prev, finish: "standard" }))}
-                    className={`px-4 py-2 text-sm rounded-md transition-all ${
-                      options.finish === "standard"
-                        ? "bg-accent text-background font-medium"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Standard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOptions(prev => ({ ...prev, finish: "premium" }))}
-                    className={`px-4 py-2 text-sm rounded-md transition-all ${
-                      options.finish === "premium"
-                        ? "bg-accent text-background font-medium"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Premium
-                  </button>
-                </div>
-              </div>
-
-              {/* Supply + Install Toggle */}
-              <label className="flex items-center justify-between p-4 bg-muted/30 border border-border/50 rounded-xl cursor-pointer hover:bg-muted/40 transition-colors">
-                <span className="text-sm text-foreground">Include Installation</span>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={options.supply_install}
-                    onChange={e => setOptions(prev => ({ ...prev, supply_install: e.target.checked }))}
-                    className="sr-only"
-                  />
-                  <div className={`w-12 h-6 rounded-full transition-colors ${options.supply_install ? 'bg-accent' : 'bg-border'}`}>
-                    <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform absolute top-0.5 ${options.supply_install ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                  </div>
-                </div>
-              </label>
+              <textarea
+                value={additionalRequirements}
+                onChange={e => setAdditionalRequirements(e.target.value)}
+                placeholder="e.g., Premium finish, include installation, specific materials, timeline requirements..."
+                rows={3}
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                Describe any specific requirements or preferences for your quote
+              </p>
             </div>
 
             {/* Submit */}
