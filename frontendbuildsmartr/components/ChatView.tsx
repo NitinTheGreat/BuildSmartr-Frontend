@@ -7,7 +7,7 @@ import {
   Loader2, Search, Clock, User, Copy, X, AlertTriangle,
   Quote, Mail
 } from "lucide-react"
-import type { Project, ChatMessage, MessageSource, ProjectAddress } from "@/types/project"
+import type { Project, ChatMessage, MessageSource, ProjectAddress, SearchMode } from "@/types/project"
 import type { SourceItem } from "@/types/streaming"
 import { MarkdownRenderer } from "@/components/MarkdownRenderer"
 import { useChatMessages } from "@/hooks/useChatMessages"
