@@ -15,6 +15,7 @@ import { PDFPreviewModal } from "./PDFPreviewModal"
 import { QuotePanel } from "./QuotePanel"
 import { useProjects } from "@/contexts/ProjectContext"
 import { useStreamingSearch } from "@/hooks/useStreamingSearch"
+import { useChatMessages } from "@/hooks/useChatMessages"
 import { useRouter } from "next/navigation"
 
 interface SearchModeOption {
@@ -68,14 +69,20 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   const {
     currentChatId,
     setCurrentChatId,
-    loadChatMessages,
     createChat,
-    addMessageToChat,
     updateChatTitle,
     deleteChat,
     updateProject,
     deleteProject
   } = useProjects()
+
+  // Fetch messages for current chat
+  const {
+    messages,
+    isLoading: messagesLoading,
+    addMessage,
+    refetch: refetchMessages,
+  } = useChatMessages(currentChatId)
 
   // Streaming search hook
   const {
@@ -106,7 +113,6 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
   }, [])
 
   const currentChat = project.chats.find(c => c.id === currentChatId)
-  const messages = currentChat?.messages || []
   // Use currentChatId to determine chat view (not currentChat) - handles case where chat was just created
   const isInChatView = !!currentChatId
 
@@ -237,10 +243,9 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
     await createChat(project.id)
   }
 
-  const handleSelectChat = async (chatId: string) => {
+  const handleSelectChat = (chatId: string) => {
+    // Setting chatId will trigger useChatMessages to fetch messages automatically
     setCurrentChatId(chatId)
-    // Load messages for the selected chat
-    await loadChatMessages(project.id, chatId)
   }
 
   const handleBackToProject = () => {
@@ -293,8 +298,25 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
         searchModes: modes.length > 0 ? modes : undefined,
       }
 
-      // Save user message to backend (fire and forget for speed)
-      addMessageToChat(project.id, chatId, userMessage).catch(console.error)
+      // Save user message to backend and add to local state
+      fetch(`/api/chats/${chatId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userMessage),
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(saved => {
+          if (saved) {
+            addMessage({
+              id: saved.id,
+              role: saved.role,
+              content: saved.content,
+              timestamp: new Date(saved.timestamp),
+              searchModes: saved.search_modes,
+            })
+          }
+        })
+        .catch(console.error)
 
       // Update chat title if it's the first message
       const chat = project.chats.find(c => c.id === chatId)
@@ -320,7 +342,24 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
             role: 'assistant' as const,
             content: 'This project hasn\'t been indexed yet. Please index your emails first to enable AI search.',
           }
-          addMessageToChat(project.id, chatId!, errorMessage).catch(console.error)
+          // Save error message and add to local state
+          fetch(`/api/chats/${chatId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(errorMessage),
+          })
+            .then(res => res.ok ? res.json() : null)
+            .then(saved => {
+              if (saved) {
+                addMessage({
+                  id: saved.id,
+                  role: saved.role,
+                  content: saved.content,
+                  timestamp: new Date(saved.timestamp),
+                })
+              }
+            })
+            .catch(console.error)
           return
         }
 
@@ -353,7 +392,25 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
             content: aiResponse.content,
             sources,
           }
-          addMessageToChat(project.id, chatId!, assistantMessage).catch(console.error)
+          // Save assistant message and add to local state
+          fetch(`/api/chats/${chatId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(assistantMessage),
+          })
+            .then(res => res.ok ? res.json() : null)
+            .then(saved => {
+              if (saved) {
+                addMessage({
+                  id: saved.id,
+                  role: saved.role,
+                  content: saved.content,
+                  timestamp: new Date(saved.timestamp),
+                  sources: saved.sources,
+                })
+              }
+            })
+            .catch(console.error)
           
           // Trigger summary update in background if needed (every ~8 messages)
           // This is fire-and-forget - doesn't block the UI
@@ -369,7 +426,24 @@ export function ProjectChatInterface({ project }: ProjectChatInterfaceProps) {
           role: 'assistant' as const,
           content: `Sorry, I encountered an error while searching: ${streamError instanceof Error ? streamError.message : 'Unknown error'}. Please try again.`,
         }
-        addMessageToChat(project.id, chatId!, errorMessage).catch(console.error)
+        // Save error message and add to local state
+        fetch(`/api/chats/${chatId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(errorMessage),
+        })
+          .then(res => res.ok ? res.json() : null)
+          .then(saved => {
+            if (saved) {
+              addMessage({
+                id: saved.id,
+                role: saved.role,
+                content: saved.content,
+                timestamp: new Date(saved.timestamp),
+              })
+            }
+          })
+          .catch(console.error)
         resetStreaming()
       }
     } catch (error) {
