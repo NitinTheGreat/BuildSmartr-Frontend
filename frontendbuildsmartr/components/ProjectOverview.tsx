@@ -755,9 +755,9 @@ export function ProjectOverview({
                           </span>
                         )}
                       </div>
-                      {quote.benchmark_range?.low && quote.benchmark_range?.high && (
+                      {quote.iivy_benchmark?.range_total?.low && quote.iivy_benchmark?.range_total?.high && (
                         <div className="mt-2 text-sm text-muted-foreground">
-                          Benchmark: ${quote.benchmark_range.low.toLocaleString()} - ${quote.benchmark_range.high.toLocaleString()}
+                          Benchmark: ${quote.iivy_benchmark.range_total.low.toLocaleString()} - ${quote.iivy_benchmark.range_total.high.toLocaleString()}
                         </div>
                       )}
                     </div>
