@@ -262,7 +262,7 @@ export function QuotePanel({
                   Project Location Required
                 </div>
                 <p className="text-sm text-amber-400/80">
-                  Please add a project address (city, region) to get vendor quotes. 
+                  Please  add a project address (city, region) to get vendor quotes. 
                   You can add this in the project settings.
                 </p>
               </div>
